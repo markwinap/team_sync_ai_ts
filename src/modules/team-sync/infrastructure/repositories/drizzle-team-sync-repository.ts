@@ -7,6 +7,7 @@ import type {
 	ProjectProfileDraft,
 	ProjectRecord,
 	ProjectRequirement,
+	RequiredTeamRole,
 	TeamMemberProfileDraft,
 	TeamMember,
 } from "~/modules/team-sync/domain/entities";
@@ -18,140 +19,48 @@ import {
 	teamSyncTalentMembers,
 } from "~/server/db/schema";
 
-const seededCompany = {
-	name: "Team Sync Labs",
-	industry: "Enterprise Software",
-	businessIntent: "Accelerate enterprise delivery with AI-assisted planning.",
-	technologyIntent: "Cloud-native, API-first, and security-compliant platforms.",
-	standards: ["SOC 2", "ISO 27001"],
-	partnerships: ["Cloud Platform Partners", "Data Integration Vendors"],
-};
+const formatLegacyTeamRole = (entry: RequiredTeamRole) => `${entry.role} (x${entry.headcount})`;
 
-const seededTalent: TeamMember[] = [
-	{
-		id: "tm-1",
-		fullName: "Anika Shah",
-		role: "Technical Architect",
-		expertise: ["System architecture", "API design", "Risk mitigation"],
-		techStack: ["TypeScript", "PostgreSQL", "AWS"],
-		certifications: ["AWS Solutions Architect"],
-		responsibilities: ["Define architecture runway", "Guide technical risk decisions"],
-		communicationStyle: "Structured facilitator with architecture decision records.",
-		growthGoals: ["Scale architecture governance across multiple squads"],
-		capacityPercent: 70,
-	},
-	{
-		id: "tm-2",
-		fullName: "Miguel Torres",
-		role: "AI Engineer",
-		expertise: ["Prompt engineering", "Model evaluation", "LLM orchestration"],
-		techStack: ["TypeScript", "Python", "OpenAI"],
-		certifications: ["Azure AI Engineer"],
-		responsibilities: ["Design prompts and eval datasets", "Harden model integration flows"],
-		communicationStyle: "Experiment-driven and transparent about trade-offs.",
-		growthGoals: ["Improve automated eval coverage for production prompts"],
-		capacityPercent: 65,
-	},
-	{
-		id: "tm-3",
-		fullName: "Olivia Brooks",
-		role: "Delivery Lead",
-		expertise: ["Stakeholder management", "Project governance", "Compliance"],
-		techStack: ["Jira", "Confluence", "PostgreSQL"],
-		certifications: ["PMP"],
-		responsibilities: ["Align stakeholders", "Own delivery governance and reporting"],
-		communicationStyle: "Concise weekly updates and proactive risk escalation.",
-		growthGoals: ["Strengthen quantitative delivery forecasting"],
-		capacityPercent: 80,
-	},
-	{
-		id: "tm-4",
-		fullName: "Kenji Mori",
-		role: "Full-Stack Engineer",
-		expertise: ["User stories", "Frontend delivery", "Integration"],
-		techStack: ["Next.js", "TypeScript", "PostgreSQL"],
-		certifications: ["Scrum Developer"],
-		responsibilities: ["Deliver dashboard features", "Integrate API and UI workflows"],
-		communicationStyle: "Hands-on pairing with fast feedback loops.",
-		growthGoals: ["Deepen system design and performance optimization skills"],
-		capacityPercent: 75,
-	},
-];
+const parseLegacyTeamRole = (value: string): RequiredTeamRole => {
+	const trimmed = value.trim();
+	const match = /^(.*)\(x(\d+)\)$/i.exec(trimmed);
 
-const seededProjects = [
-	{
-		projectName: "Orion Program",
-		summary: "Build AI-supported team orchestration and project artifact generation.",
-		requiredCapabilities: [
-			"System architecture",
-			"Prompt engineering",
-			"Risk mitigation",
-			"Stakeholder management",
-		],
-		requiredTechStack: ["TypeScript", "Next.js", "PostgreSQL", "OpenAI"],
-		riskFactors: [
-			"Potential mismatch between recommended and available talent.",
-			"Compliance evidence may be incomplete in early drafts.",
-		],
-		targetTeamSize: 3,
-	},
-	{
-		projectName: "Atlas Renewal",
-		summary: "Modernize proposal and communication workflows for enterprise accounts.",
-		requiredCapabilities: [
-			"Project governance",
-			"User stories",
-			"Integration",
-		],
-		requiredTechStack: ["TypeScript", "PostgreSQL", "AWS"],
-		riskFactors: ["Integration dependencies can delay milestone approvals."],
-		targetTeamSize: 2,
-	},
-] satisfies ProjectRequirement[];
-
-let seedPromise: Promise<void> | null = null;
-
-const seedIfEmpty = async () => {
-	if (seedPromise) {
-		await seedPromise;
-		return;
+	if (!match) {
+		return { role: trimmed, headcount: 1 };
 	}
 
-	seedPromise = (async () => {
-		const existingProject = await db.query.teamSyncProjects.findFirst();
-		if (existingProject) {
-			return;
-		}
-
-		const [company] = await db
-			.insert(teamSyncCompanies)
-			.values(seededCompany)
-			.returning({ id: teamSyncCompanies.id });
-
-		if (!company) {
-			throw new Error("Failed to create default Team Sync company.");
-		}
-
-		await db.insert(teamSyncTalentMembers).values(seededTalent);
-		await db.insert(teamSyncProjects).values(
-			seededProjects.map((project) => ({
-				companyId: company.id,
-				projectName: project.projectName,
-				summary: project.summary,
-				requiredCapabilities: project.requiredCapabilities,
-				requiredTechStack: project.requiredTechStack,
-				riskFactors: project.riskFactors,
-				targetTeamSize: project.targetTeamSize,
-			})),
-		);
-	})();
-
-	await seedPromise;
+	return {
+		role: match[1]?.trim() ?? trimmed,
+		headcount: Number(match[2]) || 1,
+	};
 };
+
+const normalizeRequiredTeamByRole = (value: RequiredTeamRole[]) =>
+	value
+		.map((item) => ({ role: item.role.trim(), headcount: Number(item.headcount) || 0 }))
+		.filter((item) => item.role.length > 0 && item.headcount > 0);
+
+const resolveRequiredTeamByRole = (
+	requiredTeamByRole: RequiredTeamRole[] | null | undefined,
+	teamRoles: string[],
+) => {
+	const normalized = normalizeRequiredTeamByRole(requiredTeamByRole ?? []);
+
+	if (normalized.length > 0) {
+		return normalized;
+	}
+
+	return normalizeRequiredTeamByRole(teamRoles.map(parseLegacyTeamRole));
+};
+
+const deriveLegacyTeamRoles = (requiredTeamByRole: RequiredTeamRole[]) =>
+	requiredTeamByRole.map(formatLegacyTeamRole);
+
+const deriveTargetTeamSize = (requiredTeamByRole: RequiredTeamRole[]) =>
+	requiredTeamByRole.reduce((total, entry) => total + entry.headcount, 0);
 
 export class DrizzleTeamSyncRepository implements TeamSyncRepository {
 	async getCompanyProfile(): Promise<CompanyProfile> {
-		await seedIfEmpty();
 		const company = await db.query.teamSyncCompanies.findFirst({
 			orderBy: (table, helpers) => [helpers.asc(table.id)],
 		});
@@ -171,7 +80,6 @@ export class DrizzleTeamSyncRepository implements TeamSyncRepository {
 	}
 
 	async listCompanyProfiles(): Promise<CompanyRecord[]> {
-		await seedIfEmpty();
 		const companies = await db
 			.select()
 			.from(teamSyncCompanies)
@@ -189,7 +97,6 @@ export class DrizzleTeamSyncRepository implements TeamSyncRepository {
 	}
 
 	async createCompanyProfile(input: CompanyProfileDraft): Promise<CompanyRecord> {
-		await seedIfEmpty();
 		const [created] = await db
 			.insert(teamSyncCompanies)
 			.values({
@@ -221,7 +128,6 @@ export class DrizzleTeamSyncRepository implements TeamSyncRepository {
 		companyId: number,
 		input: CompanyProfileDraft,
 	): Promise<CompanyRecord> {
-		await seedIfEmpty();
 		const [updated] = await db
 			.update(teamSyncCompanies)
 			.set({
@@ -251,7 +157,6 @@ export class DrizzleTeamSyncRepository implements TeamSyncRepository {
 	}
 
 	async getTalentBank(): Promise<TeamMember[]> {
-		await seedIfEmpty();
 		const members = await db.query.teamSyncTalentMembers.findMany({
 			orderBy: (table, helpers) => [helpers.asc(table.fullName)],
 		});
@@ -271,7 +176,6 @@ export class DrizzleTeamSyncRepository implements TeamSyncRepository {
 	}
 
 	async listTeamMemberProfiles(): Promise<TeamMember[]> {
-		await seedIfEmpty();
 		const members = await db
 			.select()
 			.from(teamSyncTalentMembers)
@@ -292,7 +196,6 @@ export class DrizzleTeamSyncRepository implements TeamSyncRepository {
 	}
 
 	async createTeamMemberProfile(input: TeamMemberProfileDraft): Promise<TeamMember> {
-		await seedIfEmpty();
 		const generatedId = `tm-${crypto.randomUUID().slice(0, 8)}`;
 
 		const [created] = await db
@@ -333,7 +236,6 @@ export class DrizzleTeamSyncRepository implements TeamSyncRepository {
 		memberId: string,
 		input: TeamMemberProfileDraft,
 	): Promise<TeamMember> {
-		await seedIfEmpty();
 
 		const [updated] = await db
 			.update(teamSyncTalentMembers)
@@ -370,12 +272,10 @@ export class DrizzleTeamSyncRepository implements TeamSyncRepository {
 	}
 
 	async deleteTeamMemberProfile(memberId: string): Promise<void> {
-		await seedIfEmpty();
 		await db.delete(teamSyncTalentMembers).where(eq(teamSyncTalentMembers.id, memberId));
 	}
 
 	async getProjectRequirement(projectName: string): Promise<ProjectRequirement | null> {
-		await seedIfEmpty();
 		const project = await db.query.teamSyncProjects.findFirst({
 			where: eq(teamSyncProjects.projectName, projectName),
 		});
@@ -384,47 +284,115 @@ export class DrizzleTeamSyncRepository implements TeamSyncRepository {
 			return null;
 		}
 
+		const requiredTeamByRole = resolveRequiredTeamByRole(
+			project.requiredTeamByRole,
+			project.teamRoles,
+		);
+
 		return {
 			projectName: project.projectName,
 			summary: project.summary,
+			purpose: project.purpose,
+			businessGoals: project.businessGoals,
+			stakeholders: project.stakeholders,
+			scopeIn: project.scopeIn,
+			scopeOut: project.scopeOut,
+			architectureOverview: project.architectureOverview,
+			dataModels: project.dataModels,
+			integrations: project.integrations,
 			requiredCapabilities: project.requiredCapabilities,
 			requiredTechStack: project.requiredTechStack,
+			developmentProcess: project.developmentProcess,
+			timelineMilestones: project.timelineMilestones,
 			riskFactors: project.riskFactors,
-			targetTeamSize: project.targetTeamSize,
+			operationsPlan: project.operationsPlan,
+			qualityCompliance: project.qualityCompliance,
+			dependencies: project.dependencies,
+			requiredTeamByRole,
+			teamRoles: deriveLegacyTeamRoles(requiredTeamByRole),
+			environments: project.environments,
+			deploymentStrategy: project.deploymentStrategy,
+			monitoringAndLogging: project.monitoringAndLogging,
+			maintenancePlan: project.maintenancePlan,
+			targetTeamSize: deriveTargetTeamSize(requiredTeamByRole),
 		};
 	}
 
 	async listProjectProfiles(): Promise<ProjectRecord[]> {
-		await seedIfEmpty();
 		const projects = await db
 			.select()
 			.from(teamSyncProjects)
 			.orderBy(asc(teamSyncProjects.projectName));
 
-		return projects.map((project) => ({
+		return projects.map((project) => {
+			const requiredTeamByRole = resolveRequiredTeamByRole(
+				project.requiredTeamByRole,
+				project.teamRoles,
+			);
+
+			return {
 			id: project.id,
 			companyId: project.companyId,
 			projectName: project.projectName,
 			summary: project.summary,
+			purpose: project.purpose,
+			businessGoals: project.businessGoals,
+			stakeholders: project.stakeholders,
+			scopeIn: project.scopeIn,
+			scopeOut: project.scopeOut,
+			architectureOverview: project.architectureOverview,
+			dataModels: project.dataModels,
+			integrations: project.integrations,
 			requiredCapabilities: project.requiredCapabilities,
 			requiredTechStack: project.requiredTechStack,
+			developmentProcess: project.developmentProcess,
+			timelineMilestones: project.timelineMilestones,
 			riskFactors: project.riskFactors,
-			targetTeamSize: project.targetTeamSize,
-		}));
+			operationsPlan: project.operationsPlan,
+			qualityCompliance: project.qualityCompliance,
+			dependencies: project.dependencies,
+			requiredTeamByRole,
+			teamRoles: deriveLegacyTeamRoles(requiredTeamByRole),
+			environments: project.environments,
+			deploymentStrategy: project.deploymentStrategy,
+			monitoringAndLogging: project.monitoringAndLogging,
+			maintenancePlan: project.maintenancePlan,
+			targetTeamSize: deriveTargetTeamSize(requiredTeamByRole),
+			};
+		});
 	}
 
 	async createProjectProfile(input: ProjectProfileDraft): Promise<ProjectRecord> {
-		await seedIfEmpty();
+		const requiredTeamByRole = normalizeRequiredTeamByRole(input.requiredTeamByRole);
 		const [created] = await db
 			.insert(teamSyncProjects)
 			.values({
+				requiredTeamByRole,
 				companyId: input.companyId,
 				projectName: input.projectName,
 				summary: input.summary,
+				purpose: input.purpose,
+				businessGoals: input.businessGoals,
+				stakeholders: input.stakeholders,
+				scopeIn: input.scopeIn,
+				scopeOut: input.scopeOut,
+				architectureOverview: input.architectureOverview,
+				dataModels: input.dataModels,
+				integrations: input.integrations,
 				requiredCapabilities: input.requiredCapabilities,
 				requiredTechStack: input.requiredTechStack,
+				developmentProcess: input.developmentProcess,
+				timelineMilestones: input.timelineMilestones,
 				riskFactors: input.riskFactors,
-				targetTeamSize: input.targetTeamSize,
+				operationsPlan: input.operationsPlan,
+				qualityCompliance: input.qualityCompliance,
+				dependencies: input.dependencies,
+				teamRoles: deriveLegacyTeamRoles(requiredTeamByRole),
+				environments: input.environments,
+				deploymentStrategy: input.deploymentStrategy,
+				monitoringAndLogging: input.monitoringAndLogging,
+				maintenancePlan: input.maintenancePlan,
+				targetTeamSize: deriveTargetTeamSize(requiredTeamByRole),
 			})
 			.returning();
 
@@ -432,15 +400,39 @@ export class DrizzleTeamSyncRepository implements TeamSyncRepository {
 			throw new Error("Failed to create project profile.");
 		}
 
+		const createdRequiredTeamByRole = resolveRequiredTeamByRole(
+			created.requiredTeamByRole,
+			created.teamRoles,
+		);
+
 		return {
 			id: created.id,
 			companyId: created.companyId,
 			projectName: created.projectName,
 			summary: created.summary,
+			purpose: created.purpose,
+			businessGoals: created.businessGoals,
+			stakeholders: created.stakeholders,
+			scopeIn: created.scopeIn,
+			scopeOut: created.scopeOut,
+			architectureOverview: created.architectureOverview,
+			dataModels: created.dataModels,
+			integrations: created.integrations,
 			requiredCapabilities: created.requiredCapabilities,
 			requiredTechStack: created.requiredTechStack,
+			developmentProcess: created.developmentProcess,
+			timelineMilestones: created.timelineMilestones,
 			riskFactors: created.riskFactors,
-			targetTeamSize: created.targetTeamSize,
+			operationsPlan: created.operationsPlan,
+			qualityCompliance: created.qualityCompliance,
+			dependencies: created.dependencies,
+			requiredTeamByRole: createdRequiredTeamByRole,
+			teamRoles: deriveLegacyTeamRoles(createdRequiredTeamByRole),
+			environments: created.environments,
+			deploymentStrategy: created.deploymentStrategy,
+			monitoringAndLogging: created.monitoringAndLogging,
+			maintenancePlan: created.maintenancePlan,
+			targetTeamSize: deriveTargetTeamSize(createdRequiredTeamByRole),
 		};
 	}
 
@@ -448,17 +440,36 @@ export class DrizzleTeamSyncRepository implements TeamSyncRepository {
 		projectId: number,
 		input: ProjectProfileDraft,
 	): Promise<ProjectRecord> {
-		await seedIfEmpty();
+		const requiredTeamByRole = normalizeRequiredTeamByRole(input.requiredTeamByRole);
 		const [updated] = await db
 			.update(teamSyncProjects)
 			.set({
+				requiredTeamByRole,
 				companyId: input.companyId,
 				projectName: input.projectName,
 				summary: input.summary,
+				purpose: input.purpose,
+				businessGoals: input.businessGoals,
+				stakeholders: input.stakeholders,
+				scopeIn: input.scopeIn,
+				scopeOut: input.scopeOut,
+				architectureOverview: input.architectureOverview,
+				dataModels: input.dataModels,
+				integrations: input.integrations,
 				requiredCapabilities: input.requiredCapabilities,
 				requiredTechStack: input.requiredTechStack,
+				developmentProcess: input.developmentProcess,
+				timelineMilestones: input.timelineMilestones,
 				riskFactors: input.riskFactors,
-				targetTeamSize: input.targetTeamSize,
+				operationsPlan: input.operationsPlan,
+				qualityCompliance: input.qualityCompliance,
+				dependencies: input.dependencies,
+				teamRoles: deriveLegacyTeamRoles(requiredTeamByRole),
+				environments: input.environments,
+				deploymentStrategy: input.deploymentStrategy,
+				monitoringAndLogging: input.monitoringAndLogging,
+				maintenancePlan: input.maintenancePlan,
+				targetTeamSize: deriveTargetTeamSize(requiredTeamByRole),
 			})
 			.where(eq(teamSyncProjects.id, projectId))
 			.returning();
@@ -467,32 +478,81 @@ export class DrizzleTeamSyncRepository implements TeamSyncRepository {
 			throw new Error("Failed to update project profile.");
 		}
 
+		const updatedRequiredTeamByRole = resolveRequiredTeamByRole(
+			updated.requiredTeamByRole,
+			updated.teamRoles,
+		);
+
 		return {
 			id: updated.id,
 			companyId: updated.companyId,
 			projectName: updated.projectName,
 			summary: updated.summary,
+			purpose: updated.purpose,
+			businessGoals: updated.businessGoals,
+			stakeholders: updated.stakeholders,
+			scopeIn: updated.scopeIn,
+			scopeOut: updated.scopeOut,
+			architectureOverview: updated.architectureOverview,
+			dataModels: updated.dataModels,
+			integrations: updated.integrations,
 			requiredCapabilities: updated.requiredCapabilities,
 			requiredTechStack: updated.requiredTechStack,
+			developmentProcess: updated.developmentProcess,
+			timelineMilestones: updated.timelineMilestones,
 			riskFactors: updated.riskFactors,
-			targetTeamSize: updated.targetTeamSize,
+			operationsPlan: updated.operationsPlan,
+			qualityCompliance: updated.qualityCompliance,
+			dependencies: updated.dependencies,
+			requiredTeamByRole: updatedRequiredTeamByRole,
+			teamRoles: deriveLegacyTeamRoles(updatedRequiredTeamByRole),
+			environments: updated.environments,
+			deploymentStrategy: updated.deploymentStrategy,
+			monitoringAndLogging: updated.monitoringAndLogging,
+			maintenancePlan: updated.maintenancePlan,
+			targetTeamSize: deriveTargetTeamSize(updatedRequiredTeamByRole),
 		};
 	}
 
 	async listProjectRequirements(): Promise<ProjectRequirement[]> {
-		await seedIfEmpty();
 		const projects = await db
 			.select()
 			.from(teamSyncProjects)
 			.orderBy(asc(teamSyncProjects.projectName));
 
-		return projects.map((project) => ({
+		return projects.map((project) => {
+			const requiredTeamByRole = resolveRequiredTeamByRole(
+				project.requiredTeamByRole,
+				project.teamRoles,
+			);
+
+			return {
 			projectName: project.projectName,
 			summary: project.summary,
+			purpose: project.purpose,
+			businessGoals: project.businessGoals,
+			stakeholders: project.stakeholders,
+			scopeIn: project.scopeIn,
+			scopeOut: project.scopeOut,
+			architectureOverview: project.architectureOverview,
+			dataModels: project.dataModels,
+			integrations: project.integrations,
 			requiredCapabilities: project.requiredCapabilities,
 			requiredTechStack: project.requiredTechStack,
+			developmentProcess: project.developmentProcess,
+			timelineMilestones: project.timelineMilestones,
 			riskFactors: project.riskFactors,
-			targetTeamSize: project.targetTeamSize,
-		}));
+			operationsPlan: project.operationsPlan,
+			qualityCompliance: project.qualityCompliance,
+			dependencies: project.dependencies,
+			requiredTeamByRole,
+			teamRoles: deriveLegacyTeamRoles(requiredTeamByRole),
+			environments: project.environments,
+			deploymentStrategy: project.deploymentStrategy,
+			monitoringAndLogging: project.monitoringAndLogging,
+			maintenancePlan: project.maintenancePlan,
+			targetTeamSize: deriveTargetTeamSize(requiredTeamByRole),
+			};
+		});
 	}
 }

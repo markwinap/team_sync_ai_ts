@@ -9,6 +9,7 @@ import {
 	Modal,
 	Space,
 	Table,
+	Tabs,
 	Tag,
 	Typography,
 } from "antd";
@@ -255,40 +256,52 @@ export function CompanyProfileManager() {
 					initialValues={defaultFormValues}
 					onFinish={onSubmit}
 				>
-					<Form.Item label="Company Name" name="name" rules={[{ required: true }]}>
-						<Input placeholder="Team Sync Labs" />
-					</Form.Item>
-					<Form.Item label="Industry" name="industry" rules={[{ required: true }]}>
-						<Input placeholder="Enterprise Software" />
-					</Form.Item>
-					<Form.Item
-						label="Business Intent"
-						name="businessIntent"
-						rules={[{ required: true }]}
-					>
-						<Input.TextArea rows={3} placeholder="Business goals and outcomes" />
-					</Form.Item>
-					<Form.Item
-						label="Technology Intent"
-						name="technologyIntent"
-						rules={[{ required: true }]}
-					>
-						<Input.TextArea rows={3} placeholder="Technology strategy and constraints" />
-					</Form.Item>
-					<Form.Item
-						label="Standards (comma separated)"
-						name="standards"
-						rules={[{ required: true }]}
-					>
-						<Input placeholder="SOC 2, ISO 27001" />
-					</Form.Item>
-					<Form.Item
-						label="Partnerships (comma separated)"
-						name="partnerships"
-						rules={[{ required: true }]}
-					>
-						<Input placeholder="Cloud Platform Partners" />
-					</Form.Item>
+					<Tabs
+						items={[
+							{
+								key: "overview",
+								label: "Overview",
+								children: (
+									<>
+										<Form.Item label="Company Name" name="name" rules={[{ required: true }]}>
+											<Input placeholder="Team Sync Labs" />
+										</Form.Item>
+										<Form.Item label="Industry" name="industry" rules={[{ required: true }]}>
+											<Input placeholder="Enterprise Software" />
+										</Form.Item>
+									</>
+								),
+							},
+							{
+								key: "strategy",
+								label: "Strategy",
+								children: (
+									<>
+										<Form.Item label="Business Intent" name="businessIntent" rules={[{ required: true }]}>
+											<Input.TextArea rows={3} placeholder="Business goals and outcomes" />
+										</Form.Item>
+										<Form.Item label="Technology Intent" name="technologyIntent" rules={[{ required: true }]}>
+											<Input.TextArea rows={3} placeholder="Technology strategy and constraints" />
+										</Form.Item>
+									</>
+								),
+							},
+							{
+								key: "compliance",
+								label: "Compliance",
+								children: (
+									<>
+										<Form.Item label="Standards (comma separated)" name="standards" rules={[{ required: true }]}>
+											<Input placeholder="SOC 2, ISO 27001" />
+										</Form.Item>
+										<Form.Item label="Partnerships (comma separated)" name="partnerships" rules={[{ required: true }]}>
+											<Input placeholder="Cloud Platform Partners" />
+										</Form.Item>
+									</>
+								),
+							},
+						]}
+					/>
 					<Space style={{ width: "100%", justifyContent: "flex-end" }}>
 						<Button onClick={closeModal}>Cancel</Button>
 						<Button

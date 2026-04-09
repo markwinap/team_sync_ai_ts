@@ -15,6 +15,20 @@
       "when": 1775713447185,
       "tag": "0001_concerned_mantis",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1775713500000,
+      "tag": "0002_project_profile_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1775713600000,
+      "tag": "0003_required_team_by_role",
+      "breakpoints": true
     }
   ]
 }

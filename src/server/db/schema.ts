@@ -1,4 +1,5 @@
 import { relations } from "drizzle-orm";
+import type { RequiredTeamRole } from "~/modules/team-sync/domain/entities";
 import { index, pgTableCreator, primaryKey, uniqueIndex } from "drizzle-orm/pg-core";
 import type { AdapterAccount } from "next-auth/adapters";
 
@@ -135,9 +136,28 @@ export const teamSyncProjects = createTable(
 			.references(() => teamSyncCompanies.id),
 		projectName: d.varchar({ length: 255 }).notNull(),
 		summary: d.text().notNull(),
+		purpose: d.text().notNull().default(""),
+		businessGoals: d.text().array().notNull().default([]),
+		stakeholders: d.text().array().notNull().default([]),
+		scopeIn: d.text().array().notNull().default([]),
+		scopeOut: d.text().array().notNull().default([]),
+		architectureOverview: d.text().notNull().default(""),
+		dataModels: d.text().array().notNull().default([]),
+		integrations: d.text().array().notNull().default([]),
 		requiredCapabilities: d.text().array().notNull(),
 		requiredTechStack: d.text().array().notNull(),
+		developmentProcess: d.text().notNull().default(""),
+		timelineMilestones: d.text().array().notNull().default([]),
 		riskFactors: d.text().array().notNull(),
+		operationsPlan: d.text().notNull().default(""),
+		qualityCompliance: d.text().array().notNull().default([]),
+		dependencies: d.text().array().notNull().default([]),
+		requiredTeamByRole: d.jsonb().$type<RequiredTeamRole[]>().notNull().default([]),
+		teamRoles: d.text().array().notNull().default([]),
+		environments: d.text().array().notNull().default([]),
+		deploymentStrategy: d.text().notNull().default(""),
+		monitoringAndLogging: d.text().notNull().default(""),
+		maintenancePlan: d.text().notNull().default(""),
 		targetTeamSize: d.integer().notNull(),
 		createdAt: d
 			.timestamp({ withTimezone: true })

@@ -13,13 +13,13 @@
 		"db:push": "drizzle-kit push",
 		"db:studio": "drizzle-kit studio",
 		"dev": "next dev --turbo",
-		"db:seed": "node --env-file=.env scripts/seed-team-sync.mjs",
 		"preview": "next build && next start",
 		"start": "next start",
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
 		"@auth/drizzle-adapter": "^1.7.2",
+		"@aws-sdk/client-polly": "^3.1027.0",
 		"@t3-oss/env-nextjs": "^0.12.0",
 		"@tanstack/react-query": "^5.69.0",
 		"@trpc/client": "^11.0.0",

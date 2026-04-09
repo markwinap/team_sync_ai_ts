@@ -151,7 +151,6 @@ ASSEMBLY_AI_API_KEY=        # Required to enable real-time audio transcription
 ```bash
 npm install
 npm run db:migrate     # Apply database migrations
-npm run db:seed        # Seed Team Sync demo data
 npm run dev            # Start the development server (Turbopack)
 ```
 
@@ -160,7 +159,6 @@ npm run dev            # Start the development server (Turbopack)
 ```bash
 npm run db:generate    # Generate a new migration from schema changes
 npm run db:migrate     # Apply pending migrations
-npm run db:seed        # Seed Team Sync demo records if missing
 npm run db:push        # Push schema directly (dev only)
 npm run db:studio      # Open Drizzle Studio to browse the database
 ```
@@ -236,7 +234,7 @@ src/
 - A new `modules/team-sync` vertical slice with domain, application, infrastructure, and presentation layers.
 - A `teamSync` tRPC router endpoint exposing a typed feature snapshot.
 - A dashboard page and reusable component rendering team recommendations and project artifacts.
-- Drizzle schema tables, migration scripts, and a database-backed Team Sync repository with default bootstrap seed data.
+- Drizzle schema tables, migration scripts, and a database-backed Team Sync repository.
 
 ---
 

@@ -36,15 +36,59 @@ const companyProfileInput = z.object({
 	partnerships: csvArraySchema,
 });
 
+const requiredTeamByRoleSchema = z
+	.array(
+		z.object({
+			role: z.string().trim().min(1).max(128),
+			headcount: z.number().int().min(1).max(50),
+		}),
+	)
+	.min(1)
+	.transform((items) =>
+		items
+			.map((item) => ({ role: item.role.trim(), headcount: item.headcount }))
+			.filter((item) => item.role.length > 0),
+	)
+	.refine((items) => items.length > 0, {
+		message: "At least one required team role is required.",
+	});
+
+const toLegacyTeamRoleLabel = (item: { role: string; headcount: number }) =>
+	`${item.role} (x${item.headcount})`;
+
 const projectProfileInput = z.object({
 	companyId: z.number().int().positive(),
 	projectName: z.string().trim().min(2).max(255),
 	summary: z.string().trim().min(2).max(2000),
+	purpose: z.string().trim().min(2).max(2000),
+	businessGoals: csvArraySchema,
+	stakeholders: csvArraySchema,
+	scopeIn: csvArraySchema,
+	scopeOut: csvArraySchema,
+	architectureOverview: z.string().trim().min(2).max(3000),
+	dataModels: csvArraySchema,
+	integrations: csvArraySchema,
 	requiredCapabilities: csvArraySchema,
 	requiredTechStack: csvArraySchema,
+	developmentProcess: z.string().trim().min(2).max(3000),
+	timelineMilestones: csvArraySchema,
 	riskFactors: csvArraySchema,
-	targetTeamSize: z.number().int().min(1).max(50),
-});
+	operationsPlan: z.string().trim().min(2).max(3000),
+	qualityCompliance: csvArraySchema,
+	dependencies: csvArraySchema,
+	requiredTeamByRole: requiredTeamByRoleSchema,
+	environments: csvArraySchema,
+	deploymentStrategy: z.string().trim().min(2).max(3000),
+	monitoringAndLogging: z.string().trim().min(2).max(3000),
+	maintenancePlan: z.string().trim().min(2).max(3000),
+}).transform((input) => ({
+	...input,
+	teamRoles: input.requiredTeamByRole.map(toLegacyTeamRoleLabel),
+	targetTeamSize: input.requiredTeamByRole.reduce(
+		(total, role) => total + role.headcount,
+		0,
+	),
+}));
 
 export const teamSyncRouter = createTRPCRouter({
 	snapshot: publicProcedure

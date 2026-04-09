@@ -38,12 +38,36 @@ export type CompanyRecord = CompanyProfile & {
 	id: number;
 };
 
+export type RequiredTeamRole = {
+	role: string;
+	headcount: number;
+};
+
 export type ProjectRequirement = {
 	projectName: string;
 	summary: string;
+	purpose: string;
+	businessGoals: string[];
+	stakeholders: string[];
+	scopeIn: string[];
+	scopeOut: string[];
+	architectureOverview: string;
+	dataModels: string[];
+	integrations: string[];
 	requiredCapabilities: string[];
 	requiredTechStack: string[];
+	developmentProcess: string;
+	timelineMilestones: string[];
 	riskFactors: string[];
+	operationsPlan: string;
+	qualityCompliance: string[];
+	dependencies: string[];
+	requiredTeamByRole: RequiredTeamRole[];
+	teamRoles: string[];
+	environments: string[];
+	deploymentStrategy: string;
+	monitoringAndLogging: string;
+	maintenancePlan: string;
 	targetTeamSize: number;
 };
 

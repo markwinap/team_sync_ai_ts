@@ -11,6 +11,7 @@ import {
 	Popconfirm,
 	Space,
 	Table,
+	Tabs,
 	Tag,
 	Typography,
 } from "antd";
@@ -324,37 +325,61 @@ export function TeamMemberProfileManager() {
 					initialValues={defaultFormValues}
 					onFinish={onSubmit}
 				>
-					<Form.Item label="Full Name" name="fullName" rules={[{ required: true }]}>
-						<Input placeholder="Jane Doe" />
-					</Form.Item>
-					<Form.Item label="Role" name="role" rules={[{ required: true }]}>
-						<Input placeholder="Senior Engineer" />
-					</Form.Item>
-					<Form.Item label="Capacity (%)" name="capacityPercent" rules={[{ required: true }]}>
-						<InputNumber min={0} max={100} style={{ width: "100%" }} />
-					</Form.Item>
-					<Form.Item label="Communication Style" name="communicationStyle" rules={[{ required: true }]}>
-						<Input.TextArea rows={3} placeholder="Clear and async-friendly updates" />
-					</Form.Item>
-					<Form.Item label="Expertise (comma separated)" name="expertise" rules={[{ required: true }]}>
-						<Input placeholder="System architecture, API design" />
-					</Form.Item>
-					<Form.Item label="Tech Stack (comma separated)" name="techStack" rules={[{ required: true }]}>
-						<Input placeholder="TypeScript, PostgreSQL, AWS" />
-					</Form.Item>
-					<Form.Item label="Certifications (comma separated)" name="certifications">
-						<Input placeholder="AWS Solutions Architect" />
-					</Form.Item>
-					<Form.Item
-						label="Responsibilities (comma separated)"
-						name="responsibilities"
-						rules={[{ required: true }]}
-					>
-						<Input placeholder="Guide architecture, coordinate integration" />
-					</Form.Item>
-					<Form.Item label="Growth Goals (comma separated)" name="growthGoals">
-						<Input placeholder="Increase mentoring impact" />
-					</Form.Item>
+					<Tabs
+						items={[
+							{
+								key: "identity",
+								label: "Identity",
+								children: (
+									<>
+										<Form.Item label="Full Name" name="fullName" rules={[{ required: true }]}>
+											<Input placeholder="Jane Doe" />
+										</Form.Item>
+										<Form.Item label="Role" name="role" rules={[{ required: true }]}>
+											<Input placeholder="Senior Engineer" />
+										</Form.Item>
+										<Form.Item label="Capacity (%)" name="capacityPercent" rules={[{ required: true }]}>
+											<InputNumber min={0} max={100} style={{ width: "100%" }} />
+										</Form.Item>
+									</>
+								),
+							},
+							{
+								key: "skills",
+								label: "Skills",
+								children: (
+									<>
+										<Form.Item label="Expertise (comma separated)" name="expertise" rules={[{ required: true }]}>
+											<Input placeholder="System architecture, API design" />
+										</Form.Item>
+										<Form.Item label="Tech Stack (comma separated)" name="techStack" rules={[{ required: true }]}>
+											<Input placeholder="TypeScript, PostgreSQL, AWS" />
+										</Form.Item>
+										<Form.Item label="Certifications (comma separated)" name="certifications">
+											<Input placeholder="AWS Solutions Architect" />
+										</Form.Item>
+									</>
+								),
+							},
+							{
+								key: "workstyle",
+								label: "Work Style",
+								children: (
+									<>
+										<Form.Item label="Communication Style" name="communicationStyle" rules={[{ required: true }]}>
+											<Input.TextArea rows={3} placeholder="Clear and async-friendly updates" />
+										</Form.Item>
+										<Form.Item label="Responsibilities (comma separated)" name="responsibilities" rules={[{ required: true }]}>
+											<Input placeholder="Guide architecture, coordinate integration" />
+										</Form.Item>
+										<Form.Item label="Growth Goals (comma separated)" name="growthGoals">
+											<Input placeholder="Increase mentoring impact" />
+										</Form.Item>
+									</>
+								),
+							},
+						]}
+					/>
 					<Space style={{ width: "100%", justifyContent: "flex-end" }}>
 						<Button onClick={closeModal}>Cancel</Button>
 						<Button
