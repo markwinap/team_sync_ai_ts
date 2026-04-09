@@ -16,12 +16,14 @@ export function MarkdownDisplay({ content, inline = false, className }: Markdown
 	}
 
 	const themedColors = {
-		text: "var(--text)",
-		muted: "var(--muted)",
-		accent: "var(--accent)",
-		border: "var(--border)",
-		panel: "var(--panel)",
-		panelSoft: "var(--panel-soft)",
+		text: "var(--ant-color-text, var(--text, #f5f5f5))",
+		muted:
+			"var(--ant-color-text-secondary, var(--muted, rgba(255, 255, 255, 0.75)))",
+		accent: "var(--ant-color-link, var(--accent, #69c0ff))",
+		border: "var(--ant-color-border, var(--border, #d9d9d9))",
+		panel: "var(--ant-color-bg-container, var(--panel, #1f1f1f))",
+		panelSoft:
+			"var(--ant-color-fill-tertiary, var(--panel-soft, rgba(255, 255, 255, 0.08)))",
 	};
 
 	const components = {

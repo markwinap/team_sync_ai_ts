@@ -614,11 +614,9 @@ export function TeamMemberProfileManager() {
 										>
 											Generate AI Summary
 										</Button>
-										<div className={styles.memberDecisionSummaryPanel}>
 											<MarkdownDisplay
 												content={generatedSummary ?? "No summary generated yet."}
 											/>
-										</div>
 									</Space>
 								</>
 								),
