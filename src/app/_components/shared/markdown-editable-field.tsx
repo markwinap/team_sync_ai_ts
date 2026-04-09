@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Button, Input, Space, Spin, Typography } from "antd";
 import { EditOutlined, SaveOutlined, CloseOutlined } from "@ant-design/icons";
 import { MarkdownDisplay } from "~/app/_components/shared/markdown-display";
+import { ReadAloudButton } from "~/app/_components/shared/speakable-text-area";
 
 interface MarkdownEditableFieldProps {
 	label?: string;
@@ -70,11 +71,14 @@ export function MarkdownEditableField({
 			}}
 		>
 			<Typography.Text strong>{label}</Typography.Text>
-			{!isEditing && !disabled && !readonly && !isEmpty ? (
-				<Button type="text" size="small" icon={<EditOutlined />} onClick={handleEdit}>
-					Edit
-				</Button>
-			) : null}
+			<Space size={8}>
+				{!isEmpty ? <ReadAloudButton text={renderedContent} size="small" /> : null}
+				{!isEditing && !disabled && !readonly && !isEmpty ? (
+					<Button type="text" size="small" icon={<EditOutlined />} onClick={handleEdit}>
+						Edit
+					</Button>
+				) : null}
+			</Space>
 		</div>
 	) : null;
 
