@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { index, pgTableCreator, primaryKey } from "drizzle-orm/pg-core";
+import { index, pgTableCreator, primaryKey, uniqueIndex } from "drizzle-orm/pg-core";
 import type { AdapterAccount } from "next-auth/adapters";
 
 /**
@@ -105,4 +105,129 @@ export const verificationTokens = createTable(
 		expires: d.timestamp({ mode: "date", withTimezone: true }).notNull(),
 	}),
 	(t) => [primaryKey({ columns: [t.identifier, t.token] })],
+);
+
+export const teamSyncCompanies = createTable(
+	"team_sync_company",
+	(d) => ({
+		id: d.integer().primaryKey().generatedByDefaultAsIdentity(),
+		name: d.varchar({ length: 255 }).notNull(),
+		industry: d.varchar({ length: 255 }).notNull(),
+		businessIntent: d.text().notNull(),
+		technologyIntent: d.text().notNull(),
+		standards: d.text().array().notNull(),
+		partnerships: d.text().array().notNull(),
+		createdAt: d
+			.timestamp({ withTimezone: true })
+			.$defaultFn(() => /* @__PURE__ */ new Date())
+			.notNull(),
+	}),
+	(t) => [uniqueIndex("team_sync_company_name_uq").on(t.name)],
+);
+
+export const teamSyncProjects = createTable(
+	"team_sync_project",
+	(d) => ({
+		id: d.integer().primaryKey().generatedByDefaultAsIdentity(),
+		companyId: d
+			.integer()
+			.notNull()
+			.references(() => teamSyncCompanies.id),
+		projectName: d.varchar({ length: 255 }).notNull(),
+		summary: d.text().notNull(),
+		requiredCapabilities: d.text().array().notNull(),
+		requiredTechStack: d.text().array().notNull(),
+		riskFactors: d.text().array().notNull(),
+		targetTeamSize: d.integer().notNull(),
+		createdAt: d
+			.timestamp({ withTimezone: true })
+			.$defaultFn(() => /* @__PURE__ */ new Date())
+			.notNull(),
+	}),
+	(t) => [
+		index("team_sync_project_company_idx").on(t.companyId),
+		uniqueIndex("team_sync_project_name_uq").on(t.projectName),
+	],
+);
+
+export const teamSyncTalentMembers = createTable(
+	"team_sync_talent_member",
+	(d) => ({
+		id: d.varchar({ length: 64 }).primaryKey(),
+		fullName: d.varchar({ length: 255 }).notNull(),
+		role: d.varchar({ length: 128 }).notNull(),
+		expertise: d.text().array().notNull(),
+		techStack: d.text().array().notNull(),
+		certifications: d.text().array().notNull(),
+		responsibilities: d.text().array().notNull().default([]),
+		communicationStyle: d.text().notNull().default("Collaborative"),
+		growthGoals: d.text().array().notNull().default([]),
+		capacityPercent: d.integer().notNull(),
+		createdAt: d
+			.timestamp({ withTimezone: true })
+			.$defaultFn(() => /* @__PURE__ */ new Date())
+			.notNull(),
+	}),
+	(t) => [index("team_sync_talent_member_role_idx").on(t.role)],
+);
+
+export const apiMetrics = createTable(
+	"api_metric",
+	(d) => ({
+		id: d.integer().primaryKey().generatedByDefaultAsIdentity(),
+		service: d.varchar({ length: 120 }).notNull(),
+		processingTimeMs: d.integer(),
+		inputTokens: d.integer(),
+		outputTokens: d.integer(),
+		totalCost: d.numeric({ precision: 12, scale: 6 }),
+		wasCache: d.boolean().notNull().default(false),
+		hadError: d.boolean().notNull().default(false),
+		createdAt: d
+			.timestamp({ withTimezone: true })
+			.$defaultFn(() => /* @__PURE__ */ new Date())
+			.notNull(),
+	}),
+	(t) => [
+		index("api_metric_service_idx").on(t.service),
+		index("api_metric_created_at_idx").on(t.createdAt),
+	],
+);
+
+export const cacheMetrics = createTable(
+	"cache_metric",
+	(d) => ({
+		service: d.varchar({ length: 120 }).notNull(),
+		inputHash: d.varchar({ length: 128 }).notNull(),
+		hitCount: d.integer().notNull().default(0),
+		missCount: d.integer().notNull().default(0),
+		lastAccessedAt: d
+			.timestamp({ withTimezone: true })
+			.$defaultFn(() => /* @__PURE__ */ new Date())
+			.notNull(),
+	}),
+	(t) => [
+		primaryKey({ columns: [t.service, t.inputHash] }),
+		index("cache_metric_last_access_idx").on(t.lastAccessedAt),
+	],
+);
+
+export const aiPromptVersions = createTable(
+	"ai_prompt_version",
+	(d) => ({
+		id: d.integer().primaryKey().generatedByDefaultAsIdentity(),
+		promptId: d.integer().notNull(),
+		version: d.integer().notNull(),
+		promptTemplate: d.text().notNull(),
+		systemInstruction: d.text(),
+		changeNotes: d.text(),
+		isActive: d.boolean().notNull().default(true),
+		createdAt: d
+			.timestamp({ withTimezone: true })
+			.$defaultFn(() => /* @__PURE__ */ new Date())
+			.notNull(),
+	}),
+	(t) => [
+		uniqueIndex("ai_prompt_version_prompt_version_uq").on(t.promptId, t.version),
+		index("ai_prompt_version_prompt_id_idx").on(t.promptId),
+	],
 );

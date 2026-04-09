@@ -13,6 +13,7 @@
 		"db:push": "drizzle-kit push",
 		"db:studio": "drizzle-kit studio",
 		"dev": "next dev --turbo",
+		"db:seed": "node --env-file=.env scripts/seed-team-sync.mjs",
 		"preview": "next build && next start",
 		"start": "next start",
 		"typecheck": "tsc --noEmit"
@@ -24,6 +25,7 @@
 		"@trpc/client": "^11.0.0",
 		"@trpc/react-query": "^11.0.0",
 		"@trpc/server": "^11.0.0",
+		"antd": "^6.3.5",
 		"drizzle-orm": "^0.41.0",
 		"next": "^15.2.3",
 		"next-auth": "5.0.0-beta.25",

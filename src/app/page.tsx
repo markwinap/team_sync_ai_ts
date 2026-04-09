@@ -1,70 +1,20 @@
-import Link from "next/link";
-
-import { LatestPost } from "~/app/_components/post";
+import { TeamSyncDashboard } from "~/app/_components/team-sync-dashboard";
+import { TeamSyncFacade } from "~/modules/team-sync/application/services/team-sync-facade";
+import { DrizzleTeamSyncRepository } from "~/modules/team-sync/infrastructure/repositories/drizzle-team-sync-repository";
 import { auth } from "~/server/auth";
-import { api, HydrateClient } from "~/trpc/server";
-import styles from "./index.module.css";
+import { toDashboardViewModel } from "~/modules/team-sync/presentation/view-models/dashboard-view-model";
 
 export default async function Home() {
-	const hello = await api.post.hello({ text: "from tRPC" });
-	const session = await auth();
+	const facade = new TeamSyncFacade(new DrizzleTeamSyncRepository());
+	const [snapshot, session] = await Promise.all([facade.getSnapshot(), auth()]);
+	const viewModel = toDashboardViewModel(snapshot);
+	const user = session?.user
+		? {
+				name: session.user.name ?? null,
+				email: session.user.email ?? null,
+				image: session.user.image ?? null,
+			}
+		: null;
 
-	if (session?.user) {
-		void api.post.getLatest.prefetch();
-	}
-
-	return (
-		<HydrateClient>
-			<main className={styles.main}>
-				<div className={styles.container}>
-					<h1 className={styles.title}>
-						Create <span className={styles.pinkSpan}>T3</span> App
-					</h1>
-					<div className={styles.cardRow}>
-						<Link
-							className={styles.card}
-							href="https://create.t3.gg/en/usage/first-steps"
-							target="_blank"
-						>
-							<h3 className={styles.cardTitle}>First Steps →</h3>
-							<div className={styles.cardText}>
-								Just the basics - Everything you need to know to set up your
-								database and authentication.
-							</div>
-						</Link>
-						<Link
-							className={styles.card}
-							href="https://create.t3.gg/en/introduction"
-							target="_blank"
-						>
-							<h3 className={styles.cardTitle}>Documentation →</h3>
-							<div className={styles.cardText}>
-								Learn more about Create T3 App, the libraries it uses, and how
-								to deploy it.
-							</div>
-						</Link>
-					</div>
-					<div className={styles.showcaseContainer}>
-						<p className={styles.showcaseText}>
-							{hello ? hello.greeting : "Loading tRPC query..."}
-						</p>
-
-						<div className={styles.authContainer}>
-							<p className={styles.showcaseText}>
-								{session && <span>Logged in as {session.user?.name}</span>}
-							</p>
-							<Link
-								className={styles.loginButton}
-								href={session ? "/api/auth/signout" : "/api/auth/signin"}
-							>
-								{session ? "Sign out" : "Sign in"}
-							</Link>
-						</div>
-					</div>
-
-					{session?.user && <LatestPost />}
-				</div>
-			</main>
-		</HydrateClient>
-	);
+	return <TeamSyncDashboard data={viewModel} user={user} />;
 }
