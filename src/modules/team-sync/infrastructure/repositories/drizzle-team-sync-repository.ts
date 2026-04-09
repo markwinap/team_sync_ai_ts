@@ -37,7 +37,11 @@ const parseLegacyTeamRole = (value: string): RequiredTeamRole => {
 
 const normalizeRequiredTeamByRole = (value: RequiredTeamRole[]) =>
 	value
-		.map((item) => ({ role: item.role.trim(), headcount: Number(item.headcount) || 0 }))
+		.map((item) => ({
+			role: item.role.trim(),
+			headcount: Number(item.headcount) || 0,
+			assignedMemberId: item.assignedMemberId?.trim() || undefined,
+		}))
 		.filter((item) => item.role.length > 0 && item.headcount > 0);
 
 const resolveRequiredTeamByRole = (
@@ -512,6 +516,48 @@ export class DrizzleTeamSyncRepository implements TeamSyncRepository {
 			maintenancePlan: updated.maintenancePlan,
 			targetTeamSize: deriveTargetTeamSize(updatedRequiredTeamByRole),
 		};
+	}
+
+	async updateProjectField(
+		projectId: number,
+		fieldName: string,
+		content: string,
+	): Promise<void> {
+		const allowedFields = new Set([
+			"summary",
+			"purpose",
+			"businessGoals",
+			"stakeholders",
+			"scopeIn",
+			"scopeOut",
+			"architectureOverview",
+			"dataModels",
+			"integrations",
+			"requiredCapabilities",
+			"requiredTechStack",
+			"developmentProcess",
+			"timelineMilestones",
+			"riskFactors",
+			"operationsPlan",
+			"qualityCompliance",
+			"dependencies",
+			"environments",
+			"deploymentStrategy",
+			"monitoringAndLogging",
+			"maintenancePlan",
+		]);
+
+		if (!allowedFields.has(fieldName)) {
+			throw new Error(`Unsupported project field: ${fieldName}`);
+		}
+
+		const fieldValue = content;
+
+		const updateData: Record<string, unknown> = {
+			[fieldName]: fieldValue,
+		};
+
+		await db.update(teamSyncProjects).set(updateData).where(eq(teamSyncProjects.id, projectId));
 	}
 
 	async listProjectRequirements(): Promise<ProjectRequirement[]> {

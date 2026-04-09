@@ -8,6 +8,12 @@ const asStory = (projectName: string, capability: string, index: number) => {
 	return `As stakeholder ${index + 1}, I want ${capability.toLowerCase()} support in ${projectName}, so that delivery risk is reduced.`;
 };
 
+const markdownTextToList = (value: string) =>
+	value
+		.split(/\r?\n/)
+		.map((line) => line.trim().replace(/^[-*]\s+/, ""))
+		.filter((line) => line.length > 0);
+
 export class GenerateProjectArtifactsUseCase {
 	constructor(private readonly repository: TeamSyncRepository) {}
 
@@ -22,9 +28,12 @@ export class GenerateProjectArtifactsUseCase {
 	}
 
 	private createBundle(requirement: ProjectRequirement): ProjectArtifactBundle {
+		const requiredCapabilities = markdownTextToList(requirement.requiredCapabilities);
+		const riskFactors = markdownTextToList(requirement.riskFactors);
+
 		return {
 			functionalRequirements: [
-				...requirement.requiredCapabilities.map(
+				...requiredCapabilities.map(
 					(capability) => `System must support ${capability.toLowerCase()} workflows.`,
 				),
 				"System must produce a team assignment recommendation with rationale.",
@@ -34,11 +43,11 @@ export class GenerateProjectArtifactsUseCase {
 				"All generated project artifacts should be versioned and traceable.",
 				"Access control should enforce authenticated role-based access.",
 			],
-			userStories: requirement.requiredCapabilities.map((capability, index) =>
+			userStories: requiredCapabilities.map((capability, index) =>
 				asStory(requirement.projectName, capability, index),
 			),
 			risksAndConstraints: [
-				...requirement.riskFactors,
+				...riskFactors,
 				"Talent capacity may change between recommendation and project kickoff.",
 			],
 			highLevelArchitecture: [

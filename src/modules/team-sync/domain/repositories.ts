@@ -23,5 +23,6 @@ export type TeamSyncRepository = {
 	listProjectProfiles(): Promise<ProjectRecord[]>;
 	createProjectProfile(input: ProjectProfileDraft): Promise<ProjectRecord>;
 	updateProjectProfile(projectId: number, input: ProjectProfileDraft): Promise<ProjectRecord>;
+	updateProjectField(projectId: number, fieldName: string, content: string): Promise<void>;
 	listProjectRequirements(): Promise<ProjectRequirement[]>;
 };

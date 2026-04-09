@@ -41,30 +41,31 @@ export type CompanyRecord = CompanyProfile & {
 export type RequiredTeamRole = {
 	role: string;
 	headcount: number;
+	assignedMemberId?: string;
 };
 
 export type ProjectRequirement = {
 	projectName: string;
 	summary: string;
 	purpose: string;
-	businessGoals: string[];
-	stakeholders: string[];
-	scopeIn: string[];
-	scopeOut: string[];
+	businessGoals: string;
+	stakeholders: string;
+	scopeIn: string;
+	scopeOut: string;
 	architectureOverview: string;
-	dataModels: string[];
-	integrations: string[];
-	requiredCapabilities: string[];
-	requiredTechStack: string[];
+	dataModels: string;
+	integrations: string;
+	requiredCapabilities: string;
+	requiredTechStack: string;
 	developmentProcess: string;
-	timelineMilestones: string[];
-	riskFactors: string[];
+	timelineMilestones: string;
+	riskFactors: string;
 	operationsPlan: string;
-	qualityCompliance: string[];
-	dependencies: string[];
+	qualityCompliance: string;
+	dependencies: string;
 	requiredTeamByRole: RequiredTeamRole[];
 	teamRoles: string[];
-	environments: string[];
+	environments: string;
 	deploymentStrategy: string;
 	monitoringAndLogging: string;
 	maintenancePlan: string;

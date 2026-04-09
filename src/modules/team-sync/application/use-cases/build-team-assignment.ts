@@ -11,6 +11,12 @@ const capacityWeight = 0.2;
 const capabilityWeight = 0.45;
 const stackWeight = 0.35;
 
+const markdownTextToList = (value: string) =>
+	value
+		.split(/\r?\n/)
+		.map((line) => line.trim().replace(/^[-*]\s+/, ""))
+		.filter((line) => line.length > 0);
+
 export class BuildTeamAssignmentUseCase {
 	constructor(private readonly repository: TeamSyncRepository) {}
 
@@ -22,8 +28,10 @@ export class BuildTeamAssignmentUseCase {
 		}
 
 		const members = await this.repository.getTalentBank();
+		const requiredCapabilities = markdownTextToList(requirement.requiredCapabilities);
+		const requiredTechStack = markdownTextToList(requirement.requiredTechStack);
 		const ranked = members
-			.map((member) => this.rankCandidate(member, requirement.requiredCapabilities, requirement.requiredTechStack))
+			.map((member) => this.rankCandidate(member, requiredCapabilities, requiredTechStack))
 			.sort((left, right) => right.score - left.score)
 			.slice(0, requirement.targetTeamSize);
 
@@ -31,7 +39,7 @@ export class BuildTeamAssignmentUseCase {
 			ranked.flatMap((entry) => entry.member.expertise.map(normalize)),
 		);
 
-		const uncoveredCapabilities = requirement.requiredCapabilities.filter(
+		const uncoveredCapabilities = requiredCapabilities.filter(
 			(capability) => !covered.has(normalize(capability)),
 		);
 

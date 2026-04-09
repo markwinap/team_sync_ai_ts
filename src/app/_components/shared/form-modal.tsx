@@ -10,6 +10,7 @@ interface FormModalProps {
     onCancel: () => void;
     form: FormInstance;
     onFinish: (values: any) => void;
+    onFinishFailed?: (errorInfo: any) => void;
     okText?: string;
     confirmLoading?: boolean;
     width?: Record<string, string>;
@@ -26,6 +27,7 @@ export function FormModal({
     onCancel,
     form,
     onFinish,
+    onFinishFailed,
     okText = "Save",
     confirmLoading,
     width,
@@ -57,7 +59,7 @@ export function FormModal({
             centered={centered}
             width={width}
         >
-            <Form form={form} layout="vertical" onFinish={onFinish}>
+            <Form form={form} layout="vertical" onFinish={onFinish} onFinishFailed={onFinishFailed} scrollToFirstError>
                 {children}
             </Form>
         </Modal>

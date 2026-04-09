@@ -41,46 +41,72 @@ const requiredTeamByRoleSchema = z
 		z.object({
 			role: z.string().trim().min(1).max(128),
 			headcount: z.number().int().min(1).max(50),
+			assignedMemberId: z.string().trim().min(1).max(64).optional(),
 		}),
 	)
-	.min(1)
+	.default([])
 	.transform((items) =>
 		items
-			.map((item) => ({ role: item.role.trim(), headcount: item.headcount }))
+			.map((item) => ({
+				role: item.role.trim(),
+				headcount: item.headcount,
+				assignedMemberId: item.assignedMemberId?.trim() || undefined,
+			}))
 			.filter((item) => item.role.length > 0),
-	)
-	.refine((items) => items.length > 0, {
-		message: "At least one required team role is required.",
-	});
+	);
 
 const toLegacyTeamRoleLabel = (item: { role: string; headcount: number }) =>
 	`${item.role} (x${item.headcount})`;
 
+const projectMarkdownFieldSchema = z.enum([
+	"summary",
+	"purpose",
+	"businessGoals",
+	"stakeholders",
+	"scopeIn",
+	"scopeOut",
+	"architectureOverview",
+	"dataModels",
+	"integrations",
+	"requiredCapabilities",
+	"requiredTechStack",
+	"developmentProcess",
+	"timelineMilestones",
+	"riskFactors",
+	"operationsPlan",
+	"qualityCompliance",
+	"dependencies",
+	"environments",
+	"deploymentStrategy",
+	"monitoringAndLogging",
+	"maintenancePlan",
+]);
+
 const projectProfileInput = z.object({
 	companyId: z.number().int().positive(),
 	projectName: z.string().trim().min(2).max(255),
-	summary: z.string().trim().min(2).max(2000),
-	purpose: z.string().trim().min(2).max(2000),
-	businessGoals: csvArraySchema,
-	stakeholders: csvArraySchema,
-	scopeIn: csvArraySchema,
-	scopeOut: csvArraySchema,
-	architectureOverview: z.string().trim().min(2).max(3000),
-	dataModels: csvArraySchema,
-	integrations: csvArraySchema,
-	requiredCapabilities: csvArraySchema,
-	requiredTechStack: csvArraySchema,
-	developmentProcess: z.string().trim().min(2).max(3000),
-	timelineMilestones: csvArraySchema,
-	riskFactors: csvArraySchema,
-	operationsPlan: z.string().trim().min(2).max(3000),
-	qualityCompliance: csvArraySchema,
-	dependencies: csvArraySchema,
+	summary: z.string().min(2).max(2000),
+	purpose: z.string().min(2).max(2000),
+	businessGoals: z.string().max(4000),
+	stakeholders: z.string().max(4000),
+	scopeIn: z.string().max(4000),
+	scopeOut: z.string().max(4000),
+	architectureOverview: z.string().max(3000),
+	dataModels: z.string().max(4000),
+	integrations: z.string().max(4000),
+	requiredCapabilities: z.string().max(4000),
+	requiredTechStack: z.string().max(4000),
+	developmentProcess: z.string().max(3000),
+	timelineMilestones: z.string().max(4000),
+	riskFactors: z.string().max(4000),
+	operationsPlan: z.string().max(3000),
+	qualityCompliance: z.string().max(4000),
+	dependencies: z.string().max(4000),
 	requiredTeamByRole: requiredTeamByRoleSchema,
-	environments: csvArraySchema,
-	deploymentStrategy: z.string().trim().min(2).max(3000),
-	monitoringAndLogging: z.string().trim().min(2).max(3000),
-	maintenancePlan: z.string().trim().min(2).max(3000),
+	environments: z.string().max(4000),
+	deploymentStrategy: z.string().max(3000),
+	monitoringAndLogging: z.string().max(3000),
+	maintenancePlan: z.string().max(3000),
 }).transform((input) => ({
 	...input,
 	teamRoles: input.requiredTeamByRole.map(toLegacyTeamRoleLabel),
@@ -149,6 +175,18 @@ export const teamSyncRouter = createTRPCRouter({
 		.mutation(async ({ input }) => {
 			const repository = new DrizzleTeamSyncRepository();
 			return repository.updateProjectProfile(input.projectId, input.profile);
+		}),
+	updateProjectField: publicProcedure
+		.input(
+			z.object({
+				projectId: z.number().int().positive(),
+				fieldName: projectMarkdownFieldSchema,
+				content: z.string(),
+			}),
+		)
+		.mutation(async ({ input }) => {
+			const repository = new DrizzleTeamSyncRepository();
+			return repository.updateProjectField(input.projectId, input.fieldName, input.content);
 		}),
 	createTeamMemberProfile: publicProcedure
 		.input(teamMemberProfileInput)

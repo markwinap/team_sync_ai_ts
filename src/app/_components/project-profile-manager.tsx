@@ -7,13 +7,10 @@ import {
 	Col,
 	Form,
 	Input,
-	InputNumber,
-	Divider,
 	Row,
 	Select,
 	Space,
 	Tabs,
-	Tag,
 	Typography,
 } from "antd";
 import { MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
@@ -23,35 +20,36 @@ import styles from "~/app/team-sync.module.css";
 import { DataCard } from "~/app/_components/shared/data-card";
 import { FormModal } from "~/app/_components/shared/form-modal";
 import { MODAL_WIDTH_WIDE } from "~/app/_components/shared/modal-widths";
-import { SearchSelect } from "~/app/_components/shared/search-select";
 import { SectionHeader } from "~/app/_components/shared/section-header";
+import { ProjectDetailModal } from "~/app/_components/project-detail-modal";
 import { api } from "~/trpc/react";
 
 type ProjectFormValues = {
 	requiredTeamByRole: {
 		role: string;
 		headcount: number;
+		assignedMemberId?: string;
 	}[];
 	companyId: number;
 	projectName: string;
 	summary: string;
 	purpose: string;
-	businessGoals: string[];
-	stakeholders: string[];
-	scopeIn: string[];
-	scopeOut: string[];
+	businessGoals: string;
+	stakeholders: string;
+	scopeIn: string;
+	scopeOut: string;
 	architectureOverview: string;
-	dataModels: string[];
-	integrations: string[];
-	requiredCapabilities: string[];
-	requiredTechStack: string[];
+	dataModels: string;
+	integrations: string;
+	requiredCapabilities: string;
+	requiredTechStack: string;
 	developmentProcess: string;
-	timelineMilestones: string[];
-	riskFactors: string[];
+	timelineMilestones: string;
+	riskFactors: string;
 	operationsPlan: string;
-	qualityCompliance: string[];
-	dependencies: string[];
-	environments: string[];
+	qualityCompliance: string;
+	dependencies: string;
+	environments: string;
 	deploymentStrategy: string;
 	monitoringAndLogging: string;
 	maintenancePlan: string;
@@ -63,31 +61,28 @@ const defaultFormValues: ProjectFormValues = {
 	projectName: "",
 	summary: "",
 	purpose: "",
-	businessGoals: [],
-	stakeholders: [],
-	scopeIn: [],
-	scopeOut: [],
+	businessGoals: "",
+	stakeholders: "",
+	scopeIn: "",
+	scopeOut: "",
 	architectureOverview: "",
-	dataModels: [],
-	integrations: [],
-	requiredCapabilities: [],
-	requiredTechStack: [],
+	dataModels: "",
+	integrations: "",
+	requiredCapabilities: "",
+	requiredTechStack: "",
 	developmentProcess: "",
-	timelineMilestones: [],
-	riskFactors: [],
+	timelineMilestones: "",
+	riskFactors: "",
 	operationsPlan: "",
-	qualityCompliance: [],
-	dependencies: [],
-	environments: [],
+	qualityCompliance: "",
+	dependencies: "",
+	environments: "",
 	deploymentStrategy: "",
 	monitoringAndLogging: "",
 	maintenancePlan: "",
 };
 
-const toArray = (value: string[]) =>
-	value
-		.map((item) => item.trim())
-		.filter((item) => item.length > 0);
+const normalizeText = (value: string | null | undefined) => (value ?? "").trim();
 
 const parseRequiredRole = (value: string) => {
 	const trimmedValue = value.trim();
@@ -107,19 +102,20 @@ const parseRequiredRole = (value: string) => {
 };
 
 const normalizeRequiredTeamByRole = (
-	value: ProjectFormValues["requiredTeamByRole"],
+	value: ProjectFormValues["requiredTeamByRole"] | undefined,
 ) =>
-	value
+	(value ?? [])
 		.map((entry) => ({
 			role: entry.role.trim(),
-			headcount: Number(entry.headcount) || 0,
+			headcount: 1,
+			assignedMemberId: entry.assignedMemberId?.trim() || undefined,
 		}))
-		.filter((entry) => entry.role.length > 0 && entry.headcount > 0);
+		.filter((entry) => entry.role.length > 0);
 
-const formatRequiredRole = (entry: { role: string; headcount: number }) => `${entry.role} (x${entry.headcount})`;
+const formatRequiredRole = (entry: { role: string; headcount: number }) => entry.role;
 
 const resolveRequiredTeamByRole = (project: {
-	requiredTeamByRole?: { role: string; headcount: number }[];
+	requiredTeamByRole?: { role: string; headcount: number; assignedMemberId?: string }[];
 	teamRoles: string[];
 }) => {
 	if ((project.requiredTeamByRole ?? []).length > 0) {
@@ -134,16 +130,90 @@ export function ProjectProfileManager() {
 	const [form] = Form.useForm<ProjectFormValues>();
 	const [isModalOpen, setIsModalOpen] = useState(false);
 	const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
+	const [activeTabKey, setActiveTabKey] = useState("overview");
+	const [modalValidationMessage, setModalValidationMessage] = useState<string | null>(null);
 	const [searchValue, setSearchValue] = useState("");
+	const [viewingProject, setViewingProject] = useState<(typeof projects)[number] | null>(null);
+
+	const fieldTabMap: Record<string, string> = {
+		companyId: "overview",
+		projectName: "overview",
+		summary: "overview",
+		purpose: "overview",
+		businessGoals: "business",
+		stakeholders: "business",
+		scopeIn: "business",
+		scopeOut: "business",
+		architectureOverview: "architecture",
+		dataModels: "architecture",
+		integrations: "architecture",
+		requiredCapabilities: "architecture",
+		requiredTechStack: "architecture",
+		developmentProcess: "architecture",
+		timelineMilestones: "architecture",
+		riskFactors: "risk",
+		operationsPlan: "risk",
+		qualityCompliance: "risk",
+		dependencies: "risk",
+		requiredTeamByRole: "team",
+		environments: "deployment",
+		deploymentStrategy: "deployment",
+		monitoringAndLogging: "deployment",
+		maintenancePlan: "deployment",
+	};
+
+	const tabLabelMap: Record<string, string> = {
+		overview: "Overview",
+		business: "Business & Scope",
+		architecture: "Architecture & Delivery",
+		risk: "Risk & Operations",
+		team: "Team Size & Roles",
+		deployment: "Deployment & Support",
+	};
 
 	const projectsQuery = api.teamSync.projectProfiles.useQuery();
 	const companiesQuery = api.teamSync.companyProfiles.useQuery();
+	const teamMemberProfilesQuery = api.teamSync.teamMemberProfiles.useQuery();
 
 	const companies = companiesQuery.data ?? [];
+	const teamMembers = teamMemberProfilesQuery.data ?? [];
 	const companyOptions = companies.map((company) => ({
 		value: company.id,
 		label: company.name,
 	}));
+	const teamMemberOptions = teamMembers.map((member) => ({
+		value: member.id,
+		label: `${member.fullName} (${member.role})`,
+	}));
+	const teamMemberNameById = useMemo(
+		() =>
+			new Map(
+				teamMembers.map((member) => [member.id, `${member.fullName} (${member.role})`] as const),
+			),
+		[teamMembers],
+	);
+	const watchedRequiredTeamByRole = Form.useWatch("requiredTeamByRole", form) ?? [];
+	const roleOptions = useMemo(() => {
+		const roleSet = new Set<string>();
+
+		for (const member of teamMembers) {
+			const role = member.role.trim();
+			if (role.length > 0) {
+				roleSet.add(role);
+			}
+		}
+
+		for (const entry of watchedRequiredTeamByRole) {
+			const role = entry?.role?.trim();
+			if (role) {
+				roleSet.add(role);
+			}
+		}
+
+		return [...roleSet]
+			.sort((left, right) => left.localeCompare(right))
+			.map((role) => ({ value: role, label: role }));
+	}, [teamMembers, watchedRequiredTeamByRole]);
 
 	const createMutation = api.teamSync.createProjectProfile.useMutation({
 		onSuccess: async () => {
@@ -182,26 +252,26 @@ export function ProjectProfileManager() {
 				project.projectName,
 				project.summary,
 				project.purpose,
+				project.businessGoals,
+				project.stakeholders,
+				project.scopeIn,
+				project.scopeOut,
 				project.architectureOverview,
+				project.dataModels,
+				project.integrations,
+				project.requiredCapabilities,
+				project.requiredTechStack,
 				project.developmentProcess,
+				project.timelineMilestones,
+				project.riskFactors,
 				project.operationsPlan,
+				project.qualityCompliance,
+				project.dependencies,
+				project.environments,
 				project.deploymentStrategy,
 				project.monitoringAndLogging,
 				project.maintenancePlan,
-				...project.businessGoals,
-				...project.stakeholders,
-				...project.scopeIn,
-				...project.scopeOut,
-				...project.dataModels,
-				...project.integrations,
-				...project.requiredCapabilities,
-				...project.requiredTechStack,
-				...project.timelineMilestones,
-				...project.riskFactors,
-				...project.qualityCompliance,
-				...project.dependencies,
 				...requiredTeamLabels,
-				...project.environments,
 			]
 				.join(" ")
 				.toLowerCase();
@@ -217,6 +287,8 @@ export function ProjectProfileManager() {
 
 	const openCreateModal = () => {
 		setEditingProjectId(null);
+		setActiveTabKey("overview");
+		setModalValidationMessage(null);
 		form.setFieldsValue({
 			...defaultFormValues,
 			companyId: companies[0]?.id ?? 0,
@@ -224,10 +296,14 @@ export function ProjectProfileManager() {
 		setIsModalOpen(true);
 	};
 
+	const getCompanyNameForProject = (companyId: number) => resolveCompanyName(companyId);
+
 	const openEditModal = (project: (typeof projects)[number]) => {
 		const requiredTeamByRole = resolveRequiredTeamByRole(project);
 
 		setEditingProjectId(project.id);
+		setActiveTabKey("overview");
+		setModalValidationMessage(null);
 		form.setFieldsValue({
 			requiredTeamByRole,
 			companyId: project.companyId,
@@ -263,38 +339,41 @@ export function ProjectProfileManager() {
 		}
 
 		setEditingProjectId(null);
+		setActiveTabKey("overview");
+		setModalValidationMessage(null);
 		form.setFieldsValue(defaultFormValues);
 		setIsModalOpen(false);
 	};
 
 	const onSubmit = (values: ProjectFormValues) => {
+		setModalValidationMessage(null);
 		const requiredTeamByRole = normalizeRequiredTeamByRole(values.requiredTeamByRole);
 
 		const payload = {
 			companyId: values.companyId,
-			projectName: values.projectName.trim(),
-			summary: values.summary.trim(),
-			purpose: values.purpose.trim(),
-			businessGoals: toArray(values.businessGoals),
-			stakeholders: toArray(values.stakeholders),
-			scopeIn: toArray(values.scopeIn),
-			scopeOut: toArray(values.scopeOut),
-			architectureOverview: values.architectureOverview.trim(),
-			dataModels: toArray(values.dataModels),
-			integrations: toArray(values.integrations),
-			requiredCapabilities: toArray(values.requiredCapabilities),
-			requiredTechStack: toArray(values.requiredTechStack),
-			developmentProcess: values.developmentProcess.trim(),
-			timelineMilestones: toArray(values.timelineMilestones),
-			riskFactors: toArray(values.riskFactors),
-			operationsPlan: values.operationsPlan.trim(),
-			qualityCompliance: toArray(values.qualityCompliance),
-			dependencies: toArray(values.dependencies),
+			projectName: normalizeText(values.projectName),
+			summary: values.summary,
+			purpose: values.purpose,
+			businessGoals: values.businessGoals,
+			stakeholders: values.stakeholders,
+			scopeIn: values.scopeIn,
+			scopeOut: values.scopeOut,
+			architectureOverview: values.architectureOverview,
+			dataModels: values.dataModels,
+			integrations: values.integrations,
+			requiredCapabilities: values.requiredCapabilities,
+			requiredTechStack: values.requiredTechStack,
+			developmentProcess: values.developmentProcess,
+			timelineMilestones: values.timelineMilestones,
+			riskFactors: values.riskFactors,
+			operationsPlan: values.operationsPlan,
+			qualityCompliance: values.qualityCompliance,
+			dependencies: values.dependencies,
 			requiredTeamByRole,
-			environments: toArray(values.environments),
-			deploymentStrategy: values.deploymentStrategy.trim(),
-			monitoringAndLogging: values.monitoringAndLogging.trim(),
-			maintenancePlan: values.maintenancePlan.trim(),
+			environments: values.environments,
+			deploymentStrategy: values.deploymentStrategy,
+			monitoringAndLogging: values.monitoringAndLogging,
+			maintenancePlan: values.maintenancePlan,
 		};
 
 		if (editingProjectId) {
@@ -303,6 +382,22 @@ export function ProjectProfileManager() {
 		}
 
 		createMutation.mutate(payload);
+	};
+
+	const onSubmitFailed = (errorInfo: { errorFields: Array<{ name: Array<string | number> }> }) => {
+		const firstField = errorInfo.errorFields[0];
+		const rootField = firstField?.name?.[0];
+		const mappedTabKey = typeof rootField === "string" ? fieldTabMap[rootField] : undefined;
+
+		if (mappedTabKey) {
+			setActiveTabKey(mappedTabKey);
+			setModalValidationMessage(
+				`Please complete required fields in ${tabLabelMap[mappedTabKey]} before saving.`,
+			);
+			return;
+		}
+
+		setModalValidationMessage("Please complete the required fields before saving.");
 	};
 
 	const columns: ColumnsType<(typeof projects)[number]> = [
@@ -330,27 +425,12 @@ export function ProjectProfileManager() {
 			),
 		},
 		{
-			title: "Required Team",
-			dataIndex: "targetTeamSize",
-			key: "targetTeamSize",
-			sorter: (left, right) => left.targetTeamSize - right.targetTeamSize,
-			render: (_value: number, project) => (
-				<Space size={[4, 4]} wrap>
-					{resolveRequiredTeamByRole(project).map((roleEntry) => (
-						<Tag key={`${roleEntry.role}:${roleEntry.headcount}`} color="cyan">
-							{formatRequiredRole(roleEntry)}
-						</Tag>
-					))}
-				</Space>
-			),
-		},
-		{
 			title: "Stakeholders",
 			dataIndex: "stakeholders",
 			key: "stakeholders",
-			render: (values: string[]) => (
-				<Typography.Text ellipsis={{ tooltip: values.join(", ") }} style={{ maxWidth: 240 }}>
-					{values.join(", ")}
+			render: (value: string) => (
+				<Typography.Text ellipsis={{ tooltip: value }} style={{ maxWidth: 240 }}>
+					{value}
 				</Typography.Text>
 			),
 		},
@@ -358,37 +438,31 @@ export function ProjectProfileManager() {
 			title: "Capabilities",
 			dataIndex: "requiredCapabilities",
 			key: "requiredCapabilities",
-			render: (values: string[]) => (
-				<Space size={[4, 4]} wrap>
-					{values.map((item) => (
-						<Tag key={item} color="blue">
-							{item}
-						</Tag>
-					))}
-				</Space>
+			render: (value: string) => (
+				<Typography.Text ellipsis={{ tooltip: value }} style={{ maxWidth: 240 }}>
+					{value}
+				</Typography.Text>
 			),
 		},
 		{
 			title: "Tech Stack",
 			dataIndex: "requiredTechStack",
 			key: "requiredTechStack",
-			render: (values: string[]) => (
-				<Space size={[4, 4]} wrap>
-					{values.map((item) => (
-						<Tag key={item} color="geekblue">
-							{item}
-						</Tag>
-					))}
-				</Space>
+			render: (value: string) => (
+				<Typography.Text ellipsis={{ tooltip: value }} style={{ maxWidth: 240 }}>
+					{value}
+				</Typography.Text>
 			),
 		},
 		{
 			title: "Actions",
 			key: "actions",
 			render: (_, project) => (
-				<Button size="small" onClick={() => openEditModal(project)}>
-					Edit
-				</Button>
+				<Space>
+					<Button size="small" onClick={() => openEditModal(project)}>
+						Edit
+					</Button>
+				</Space>
 			),
 		},
 	];
@@ -440,7 +514,9 @@ export function ProjectProfileManager() {
 				rowKey="id"
 				columns={columns}
 				dataSource={projects}
-				loading={projectsQuery.isLoading || companiesQuery.isLoading}
+				loading={
+					projectsQuery.isLoading || companiesQuery.isLoading || teamMemberProfilesQuery.isLoading
+				}
 				pageSize={6}
 			/>
 
@@ -455,11 +531,22 @@ export function ProjectProfileManager() {
 				width={MODAL_WIDTH_WIDE}
 				form={form}
 				onFinish={onSubmit}
+				onFinishFailed={onSubmitFailed}
 				okText={editingProjectId ? "Save Changes" : "Create Project"}
 				confirmLoading={createMutation.isPending || updateMutation.isPending}
 				subtitle="All project profile dimensions are editable from this form."
 			>
+				{modalValidationMessage && (
+					<Alert showIcon type="error" title={modalValidationMessage} style={{ marginBottom: 12 }} />
+				)}
 				<Tabs
+					activeKey={activeTabKey}
+					onChange={(nextKey) => {
+						setActiveTabKey(nextKey);
+						if (modalValidationMessage) {
+							setModalValidationMessage(null);
+						}
+					}}
 					items={[
 						{
 							key: "overview",
@@ -473,16 +560,28 @@ export function ProjectProfileManager() {
 											</Form.Item>
 										</Col>
 										<Col xs={24} md={12}>
-											<Form.Item label="Project Name" name="projectName" rules={[{ required: true }]}>
-												<Input placeholder="Orion Program" />
+											<Form.Item
+												label="Project Name"
+												name="projectName"
+												rules={[{ required: true, whitespace: true, message: "Project Name is required" }]}
+											>
+												<Input placeholder="Project title (markdown supported)" />
 											</Form.Item>
 										</Col>
 									</Row>
-									<Form.Item label="Description" name="summary" rules={[{ required: true }]}>
-										<Input.TextArea rows={3} placeholder="Project summary and context" />
+									<Form.Item
+										label="Description"
+										name="summary"
+										rules={[{ required: true, whitespace: true, message: "Description is required" }]}
+									>
+										<Input.TextArea rows={4} placeholder="Project summary and context (markdown supported)" />
 									</Form.Item>
-									<Form.Item label="Purpose" name="purpose" rules={[{ required: true }]}>
-										<Input.TextArea rows={2} placeholder="Why this project exists" />
+									<Form.Item
+										label="Purpose"
+										name="purpose"
+										rules={[{ required: true, whitespace: true, message: "Purpose is required" }]}
+									>
+										<Input.TextArea rows={3} placeholder="Why this project exists (markdown supported)" />
 									</Form.Item>
 								</>
 							),
@@ -492,21 +591,21 @@ export function ProjectProfileManager() {
 							label: "Business & Scope",
 							children: (
 								<>
-									<Form.Item label="Business Goals" name="businessGoals" rules={[{ required: true }]}>
-										<SearchSelect mode="tags" tokenSeparators={[","]} placeholder="Add business goals" />
+									<Form.Item label="Business Goals" name="businessGoals">
+										<Input.TextArea rows={4} placeholder="Markdown list, one item per line" />
 									</Form.Item>
-									<Form.Item label="Stakeholders" name="stakeholders" rules={[{ required: true }]}>
-										<SearchSelect mode="tags" tokenSeparators={[","]} placeholder="Add stakeholders" />
+									<Form.Item label="Stakeholders" name="stakeholders">
+										<Input.TextArea rows={4} placeholder="Markdown list, one item per line" />
 									</Form.Item>
 									<Row gutter={16}>
 										<Col xs={24} md={12}>
-											<Form.Item label="Scope In" name="scopeIn" rules={[{ required: true }]}>
-												<SearchSelect mode="tags" tokenSeparators={[","]} placeholder="In-scope items" />
+											<Form.Item label="Scope In" name="scopeIn">
+												<Input.TextArea rows={4} placeholder="Markdown list, one item per line" />
 											</Form.Item>
 										</Col>
 										<Col xs={24} md={12}>
-											<Form.Item label="Scope Out" name="scopeOut" rules={[{ required: true }]}>
-												<SearchSelect mode="tags" tokenSeparators={[","]} placeholder="Out-of-scope items" />
+											<Form.Item label="Scope Out" name="scopeOut">
+												<Input.TextArea rows={4} placeholder="Markdown list, one item per line" />
 											</Form.Item>
 										</Col>
 									</Row>
@@ -518,26 +617,26 @@ export function ProjectProfileManager() {
 							label: "Architecture & Delivery",
 							children: (
 								<>
-									<Form.Item label="Architecture Overview" name="architectureOverview" rules={[{ required: true }]}>
-										<Input.TextArea rows={3} placeholder="Architecture direction and key patterns" />
+									<Form.Item label="Architecture Overview" name="architectureOverview">
+										<Input.TextArea rows={4} placeholder="Architecture direction and key patterns (markdown supported)" />
 									</Form.Item>
-									<Form.Item label="Data Models" name="dataModels" rules={[{ required: true }]}>
-										<SearchSelect mode="tags" tokenSeparators={[","]} placeholder="Add data model concepts" />
+									<Form.Item label="Data Models" name="dataModels">
+										<Input.TextArea rows={4} placeholder="Markdown list, one item per line" />
 									</Form.Item>
-									<Form.Item label="Integrations" name="integrations" rules={[{ required: true }]}>
-										<SearchSelect mode="tags" tokenSeparators={[","]} placeholder="Add integration points" />
+									<Form.Item label="Integrations" name="integrations">
+										<Input.TextArea rows={4} placeholder="Markdown list, one item per line" />
 									</Form.Item>
-									<Form.Item label="Required Capabilities" name="requiredCapabilities" rules={[{ required: true }]}>
-										<SearchSelect mode="tags" tokenSeparators={[","]} placeholder="Add required capabilities" />
+									<Form.Item label="Required Capabilities" name="requiredCapabilities">
+										<Input.TextArea rows={4} placeholder="Markdown list, one item per line" />
 									</Form.Item>
-									<Form.Item label="Technology Stack" name="requiredTechStack" rules={[{ required: true }]}>
-										<SearchSelect mode="tags" tokenSeparators={[","]} placeholder="Add required technologies" />
+									<Form.Item label="Technology Stack" name="requiredTechStack">
+										<Input.TextArea rows={4} placeholder="Markdown list, one item per line" />
 									</Form.Item>
-									<Form.Item label="Development Process" name="developmentProcess" rules={[{ required: true }]}>
-										<Input.TextArea rows={3} placeholder="Delivery process, cadence, and governance" />
+									<Form.Item label="Development Process" name="developmentProcess">
+										<Input.TextArea rows={4} placeholder="Delivery process, cadence, and governance (markdown supported)" />
 									</Form.Item>
-									<Form.Item label="Timeline & Milestones" name="timelineMilestones" rules={[{ required: true }]}>
-										<SearchSelect mode="tags" tokenSeparators={[","]} placeholder="Add timeline checkpoints" />
+									<Form.Item label="Timeline & Milestones" name="timelineMilestones">
+										<Input.TextArea rows={4} placeholder="Markdown list, one item per line" />
 									</Form.Item>
 								</>
 							),
@@ -547,78 +646,18 @@ export function ProjectProfileManager() {
 							label: "Risk & Operations",
 							children: (
 								<>
-									<Form.Item label="Risks & Constraints" name="riskFactors" rules={[{ required: true }]}>
-										<SearchSelect mode="tags" tokenSeparators={[","]} placeholder="Add risks and constraints" />
+									<Form.Item label="Risks & Constraints" name="riskFactors">
+										<Input.TextArea rows={4} placeholder="Markdown list, one item per line" />
 									</Form.Item>
-									<Form.Item label="Operations Plan" name="operationsPlan" rules={[{ required: true }]}>
-										<Input.TextArea rows={3} placeholder="Operations model and ownership" />
+									<Form.Item label="Operations Plan" name="operationsPlan">
+										<Input.TextArea rows={4} placeholder="Operations model and ownership (markdown supported)" />
 									</Form.Item>
-									<Form.Item label="Quality & Compliance" name="qualityCompliance" rules={[{ required: true }]}>
-										<SearchSelect mode="tags" tokenSeparators={[","]} placeholder="Add quality and compliance requirements" />
+									<Form.Item label="Quality & Compliance" name="qualityCompliance">
+										<Input.TextArea rows={4} placeholder="Markdown list, one item per line" />
 									</Form.Item>
-									<Form.Item label="Dependencies" name="dependencies" rules={[{ required: true }]}>
-										<SearchSelect mode="tags" tokenSeparators={[","]} placeholder="Add dependencies" />
+									<Form.Item label="Dependencies" name="dependencies">
+										<Input.TextArea rows={4} placeholder="Markdown list, one item per line" />
 									</Form.Item>
-									<Divider>Required Team Members</Divider>
-									<Form.List
-										name="requiredTeamByRole"
-										rules={[
-											{
-												validator: async (_, value: ProjectFormValues["requiredTeamByRole"]) => {
-													if (normalizeRequiredTeamByRole(value ?? []).length > 0) {
-														return;
-													}
-
-													throw new Error("Add at least one role and required headcount.");
-												},
-											},
-										]}
-									>
-										{(fields, { add, remove }, { errors }) => (
-											<>
-												{fields.map((field) => (
-													<Row key={field.key} gutter={12} align="middle" style={{ marginBottom: 8 }}>
-														<Col xs={24} md={14}>
-															<Form.Item
-																{...field}
-																label="Role"
-																name={[field.name, "role"]}
-																rules={[{ required: true, message: "Role is required" }]}
-															>
-																<Input placeholder="AI Engineer" />
-															</Form.Item>
-														</Col>
-														<Col xs={20} md={8}>
-															<Form.Item
-																{...field}
-																label="People"
-																name={[field.name, "headcount"]}
-																rules={[{ required: true, message: "Count is required" }]}
-															>
-																<InputNumber min={1} max={50} style={{ width: "100%" }} />
-															</Form.Item>
-														</Col>
-														<Col xs={4} md={2}>
-															<Button
-																type="text"
-																danger
-																icon={<MinusCircleOutlined />}
-																onClick={() => remove(field.name)}
-															/>
-														</Col>
-													</Row>
-												))}
-												<Form.ErrorList errors={errors} />
-												<Button
-													type="dashed"
-													icon={<PlusOutlined />}
-													onClick={() => add({ role: "", headcount: 1 })}
-												>
-													Add Required Role
-												</Button>
-											</>
-										)}
-									</Form.List>
 								</>
 							),
 						},
@@ -627,27 +666,117 @@ export function ProjectProfileManager() {
 							label: "Deployment & Support",
 							children: (
 								<>
-									<Form.Item label="Environments" name="environments" rules={[{ required: true }]}>
-										<SearchSelect mode="tags" tokenSeparators={[","]} placeholder="dev, staging, prod" />
+									<Form.Item label="Environments" name="environments">
+										<Input.TextArea rows={4} placeholder="Markdown list, one item per line" />
 									</Form.Item>
-									<Form.Item label="Deployment Strategy" name="deploymentStrategy" rules={[{ required: true }]}>
-										<Input.TextArea rows={2} placeholder="How releases are rolled out safely" />
+									<Form.Item label="Deployment Strategy" name="deploymentStrategy">
+										<Input.TextArea rows={4} placeholder="How releases are rolled out safely (markdown supported)" />
 									</Form.Item>
-									<Form.Item label="Monitoring & Logging" name="monitoringAndLogging" rules={[{ required: true }]}>
-										<Input.TextArea rows={2} placeholder="Telemetry, dashboards, and alerting" />
+									<Form.Item label="Monitoring & Logging" name="monitoringAndLogging">
+										<Input.TextArea rows={4} placeholder="Telemetry, dashboards, and alerting (markdown supported)" />
 									</Form.Item>
-									<Form.Item label="Maintenance Plan" name="maintenancePlan" rules={[{ required: true }]}>
-										<Input.TextArea rows={2} placeholder="Ongoing maintenance and review cadence" />
+									<Form.Item label="Maintenance Plan" name="maintenancePlan">
+										<Input.TextArea rows={4} placeholder="Ongoing maintenance and review cadence (markdown supported)" />
 									</Form.Item>
 									<Typography.Text type="secondary">
-										Target team size is calculated from required roles and people counts.
+										Team size is optional. Add roles only if needed.
+									</Typography.Text>
+								</>
+							),
+						},
+												{
+							key: "team",
+							label: "Team Size & Roles",
+							children: (
+								<>
+									<Form.List name="requiredTeamByRole">
+										{(fields, { add, remove }, { errors }) => (
+											<>
+												<Row justify="end" align="middle" style={{ marginBottom: 12 }}>
+													<Button
+														type="dashed"
+														icon={<PlusOutlined />}
+														onClick={() => add({ role: "", headcount: 1 })}
+													>
+														Add Required Role
+													</Button>
+												</Row>
+												{fields.map((field) => (
+													<Row
+														key={field.key}
+														gutter={[12, 0]}
+														align="middle"
+														style={{
+															marginBottom: 10,
+															padding: 12,
+															border: "1px solid rgba(255, 255, 255, 0.1)",
+															borderRadius: 10,
+														}}
+													>
+														<Col xs={24} md={11}>
+															<Form.Item
+																{...field}
+																label="Role"
+																name={[field.name, "role"]}
+																rules={[{ required: true, message: "Role is required" }]}
+															>
+																<Select
+																	showSearch
+																	options={roleOptions}
+																	placeholder="Select role"
+																	optionFilterProp="label"
+																	notFoundContent="No roles available"
+																/>
+															</Form.Item>
+														</Col>
+														<Col xs={24} md={11}>
+															<Form.Item
+																{...field}
+																label="Optional Team Member"
+																name={[field.name, "assignedMemberId"]}
+															>
+																<Select
+																	allowClear
+																	showSearch
+																	options={teamMemberOptions}
+																	placeholder="Select profile"
+																	optionFilterProp="label"
+																	notFoundContent="No team profiles"
+																/>
+															</Form.Item>
+														</Col>
+														<Col xs={24} md={2}>
+															<Form.Item label=" " style={{ marginBottom: 0 }}>
+																<Button
+																	type="text"
+																	danger
+																	icon={<MinusCircleOutlined />}
+																	onClick={() => remove(field.name)}
+																/>
+															</Form.Item>
+														</Col>
+													</Row>
+												))}
+												<Form.ErrorList errors={errors} />
+											</>
+										)}
+									</Form.List>
+									<Typography.Text type="secondary">
+										You can optionally pre-assign a profile to each role from available team members.
 									</Typography.Text>
 								</>
 							),
 						},
 					]}
 				/>
-			</FormModal>
+
+			<ProjectDetailModal
+				open={viewingProject !== null}
+				onClose={() => setViewingProject(null)}
+				project={viewingProject}
+				companyName={viewingProject ? getCompanyNameForProject(viewingProject.companyId) : ""}
+			/>
+		</FormModal>
 		</section>
 	);
 }
