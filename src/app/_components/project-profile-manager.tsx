@@ -22,7 +22,10 @@ import { FormModal } from "~/app/_components/shared/form-modal";
 import { MODAL_WIDTH_WIDE } from "~/app/_components/shared/modal-widths";
 import { SectionHeader } from "~/app/_components/shared/section-header";
 import { api } from "~/trpc/react";
-import { MarkdownEditableField } from "./shared/markdown-editable-field";
+import {
+	MarkdownEditableField,
+	type MarkdownReferenceField,
+} from "./shared/markdown-editable-field";
 
 type ProjectFormValues = {
 	requiredTeamByRole: {
@@ -103,6 +106,36 @@ type ProjectMarkdownField =
 	| "deploymentStrategy"
 	| "monitoringAndLogging"
 	| "maintenancePlan";
+
+type ProjectReferenceFieldKey =
+	| "companyName"
+	| "companyProfile"
+	| "projectName"
+	| ProjectMarkdownField
+	| "requiredTeamByRole";
+
+const projectFieldReferenceDefaults: Record<ProjectMarkdownField, ProjectReferenceFieldKey[]> = {
+	summary: ["projectName", "purpose", "businessGoals", "stakeholders"],
+	purpose: ["projectName", "summary", "businessGoals", "stakeholders"],
+	businessGoals: ["projectName", "summary", "purpose", "stakeholders"],
+	stakeholders: ["projectName", "summary", "purpose", "businessGoals"],
+	scopeIn: ["projectName", "summary", "purpose", "scopeOut"],
+	scopeOut: ["projectName", "summary", "purpose", "scopeIn"],
+	architectureOverview: ["projectName", "summary", "requiredTechStack", "integrations"],
+	dataModels: ["projectName", "architectureOverview", "integrations", "scopeIn"],
+	integrations: ["projectName", "architectureOverview", "dataModels", "requiredTechStack"],
+	requiredTechStack: ["projectName", "architectureOverview", "integrations", "developmentProcess"],
+	developmentProcess: ["projectName", "summary", "timelineMilestones", "requiredTeamByRole"],
+	timelineMilestones: ["projectName", "summary", "developmentProcess", "dependencies"],
+	riskFactors: ["projectName", "summary", "dependencies", "operationsPlan"],
+	operationsPlan: ["projectName", "riskFactors", "qualityCompliance", "monitoringAndLogging"],
+	qualityCompliance: ["projectName", "riskFactors", "operationsPlan", "requiredTechStack"],
+	dependencies: ["projectName", "summary", "timelineMilestones", "integrations"],
+	environments: ["projectName", "deploymentStrategy", "monitoringAndLogging", "maintenancePlan"],
+	deploymentStrategy: ["projectName", "environments", "timelineMilestones", "requiredTechStack"],
+	monitoringAndLogging: ["projectName", "deploymentStrategy", "operationsPlan", "riskFactors"],
+	maintenancePlan: ["projectName", "deploymentStrategy", "monitoringAndLogging", "operationsPlan"],
+};
 
 const parseRequiredRole = (value: string) => {
 	const trimmedValue = value.trim();
@@ -204,6 +237,7 @@ export function ProjectProfileManager() {
 		value: member.id,
 		label: `${member.fullName} (${member.role})`,
 	}));
+	const watchedFormValues = Form.useWatch([], form) as Partial<ProjectFormValues> | undefined;
 	const teamMemberNameById = useMemo(
 		() =>
 			new Map(
@@ -255,6 +289,92 @@ export function ProjectProfileManager() {
 	});
 
 	const updateFieldMutation = api.teamSync.updateProjectField.useMutation();
+	const generateFieldMutation = api.teamSync.generateProjectFieldMarkdown.useMutation();
+
+	const projectReferenceFields = useMemo<MarkdownReferenceField[]>(() => {
+		const companyId = watchedFormValues?.companyId ?? 0;
+		const company = companies.find((item) => item.id === companyId);
+		const companyName = company?.name;
+		const companyProfileLines = [
+			company?.name?.trim() ? `Name: ${company.name.trim()}` : "",
+			company?.industry?.trim() ? `Industry: ${company.industry.trim()}` : "",
+			company?.businessIntent?.trim() ? `Business Intent: ${company.businessIntent.trim()}` : "",
+			company?.technologyIntent?.trim() ? `Technology Intent: ${company.technologyIntent.trim()}` : "",
+			(company?.standards ?? []).length > 0 ? `Standards: ${company?.standards.join(", ")}` : "",
+			(company?.partnerships ?? []).length > 0
+				? `Partnerships: ${company?.partnerships.join(", ")}`
+				: "",
+		].filter((line) => line.length > 0);
+		const companyProfileContext = companyProfileLines.join("\n");
+		const requiredTeamLines = normalizeRequiredTeamByRole(
+			watchedFormValues?.requiredTeamByRole,
+		).map((entry) => {
+			const assignedLabel = entry.assignedMemberId
+				? teamMemberNameById.get(entry.assignedMemberId)
+				: undefined;
+
+			return assignedLabel ? `- ${entry.role} (${assignedLabel})` : `- ${entry.role}`;
+		});
+
+		return [
+			{ key: "companyName", label: "Company", value: companyName ?? "" },
+			{ key: "companyProfile", label: "Company Profile", value: companyProfileContext },
+			{ key: "projectName", label: "Project Name", value: watchedFormValues?.projectName },
+			{ key: "summary", label: "Description", value: watchedFormValues?.summary },
+			{ key: "purpose", label: "Purpose", value: watchedFormValues?.purpose },
+			{ key: "businessGoals", label: "Business Goals", value: watchedFormValues?.businessGoals },
+			{ key: "stakeholders", label: "Stakeholders", value: watchedFormValues?.stakeholders },
+			{ key: "scopeIn", label: "Scope In", value: watchedFormValues?.scopeIn },
+			{ key: "scopeOut", label: "Scope Out", value: watchedFormValues?.scopeOut },
+			{
+				key: "architectureOverview",
+				label: "Architecture Overview",
+				value: watchedFormValues?.architectureOverview,
+			},
+			{ key: "dataModels", label: "Data Models", value: watchedFormValues?.dataModels },
+			{ key: "integrations", label: "Integrations", value: watchedFormValues?.integrations },
+			{
+				key: "requiredTechStack",
+				label: "Technology Stack",
+				value: watchedFormValues?.requiredTechStack,
+			},
+			{
+				key: "developmentProcess",
+				label: "Development Process",
+				value: watchedFormValues?.developmentProcess,
+			},
+			{
+				key: "timelineMilestones",
+				label: "Timeline & Milestones",
+				value: watchedFormValues?.timelineMilestones,
+			},
+			{ key: "riskFactors", label: "Risks & Constraints", value: watchedFormValues?.riskFactors },
+			{ key: "operationsPlan", label: "Operations Plan", value: watchedFormValues?.operationsPlan },
+			{
+				key: "qualityCompliance",
+				label: "Quality & Compliance",
+				value: watchedFormValues?.qualityCompliance,
+			},
+			{ key: "dependencies", label: "Dependencies", value: watchedFormValues?.dependencies },
+			{
+				key: "requiredTeamByRole",
+				label: "Team Size & Roles",
+				value: requiredTeamLines.join("\n"),
+			},
+			{ key: "environments", label: "Environments", value: watchedFormValues?.environments },
+			{
+				key: "deploymentStrategy",
+				label: "Deployment Strategy",
+				value: watchedFormValues?.deploymentStrategy,
+			},
+			{
+				key: "monitoringAndLogging",
+				label: "Monitoring & Logging",
+				value: watchedFormValues?.monitoringAndLogging,
+			},
+			{ key: "maintenancePlan", label: "Maintenance Plan", value: watchedFormValues?.maintenancePlan },
+		];
+	}, [companies, teamMemberNameById, watchedFormValues]);
 
 	const handleFieldUpdate = async (fieldName: ProjectMarkdownField, content: string) => {
 		form.setFieldValue(fieldName, content);
@@ -280,6 +400,60 @@ export function ProjectProfileManager() {
 		});
 
 		return content;
+	};
+
+	const getReferenceFieldsForTarget = (fieldName: ProjectMarkdownField) =>
+		projectReferenceFields.filter((field) => field.key !== fieldName);
+
+	const handleFieldGenerate = async (
+		fieldName: ProjectMarkdownField,
+		params: {
+			currentContent: string;
+			referenceFieldKeys: string[];
+			prompt: string;
+		},
+	) => {
+		const availableReferenceFields = getReferenceFieldsForTarget(fieldName);
+		const selectedReferenceFields = availableReferenceFields
+			.filter((field) => params.referenceFieldKeys.includes(field.key))
+			.map((field) => ({
+				key: field.key,
+				label: field.label,
+				value: normalizeText(field.value),
+			}))
+			.filter((field) => field.value.length > 0);
+
+		const companyProfileReference = availableReferenceFields.find(
+			(field) => field.key === "companyProfile",
+		);
+
+		if (companyProfileReference) {
+			const companyProfileValue = normalizeText(companyProfileReference.value);
+			if (
+				companyProfileValue.length > 0 &&
+				!selectedReferenceFields.some((field) => field.key === "companyProfile")
+			) {
+				selectedReferenceFields.unshift({
+					key: "companyProfile",
+					label: companyProfileReference.label,
+					value: companyProfileValue,
+				});
+			}
+		}
+
+		if (selectedReferenceFields.length === 0) {
+			return params.currentContent;
+		}
+
+		const generated = await generateFieldMutation.mutateAsync({
+			targetField: fieldName,
+			currentContent: params.currentContent,
+			prompt: params.prompt,
+			referenceFields: selectedReferenceFields,
+		});
+
+		form.setFieldValue(fieldName, generated.generatedContent);
+		return generated.generatedContent;
 	};
 
 	const isSubmitting = createMutation.isPending || updateMutation.isPending;
@@ -549,6 +723,9 @@ export function ProjectProfileManager() {
 								label="Business Goals"
 								content={form.getFieldValue("businessGoals")}
 								onSave={(content) => handleFieldUpdate("businessGoals", content)}
+								onGenerate={(params) => handleFieldGenerate("businessGoals", params)}
+								referenceFields={getReferenceFieldsForTarget("businessGoals")}
+								defaultReferenceFieldKeys={projectFieldReferenceDefaults.businessGoals}
 							/>
 						</div>
 						<div style={{ marginBottom: 16 }}>
@@ -556,6 +733,9 @@ export function ProjectProfileManager() {
 								label="Stakeholders"
 								content={form.getFieldValue("stakeholders")}
 								onSave={(content) => handleFieldUpdate("stakeholders", content)}
+								onGenerate={(params) => handleFieldGenerate("stakeholders", params)}
+								referenceFields={getReferenceFieldsForTarget("stakeholders")}
+								defaultReferenceFieldKeys={projectFieldReferenceDefaults.stakeholders}
 							/>
 						</div>
 						<Row gutter={16}>
@@ -565,6 +745,9 @@ export function ProjectProfileManager() {
 										label="Scope In"
 										content={form.getFieldValue("scopeIn")}
 										onSave={(content) => handleFieldUpdate("scopeIn", content)}
+										onGenerate={(params) => handleFieldGenerate("scopeIn", params)}
+										referenceFields={getReferenceFieldsForTarget("scopeIn")}
+										defaultReferenceFieldKeys={projectFieldReferenceDefaults.scopeIn}
 									/>
 								</div>
 							</Col>
@@ -574,6 +757,9 @@ export function ProjectProfileManager() {
 										label="Scope Out"
 										content={form.getFieldValue("scopeOut")}
 										onSave={(content) => handleFieldUpdate("scopeOut", content)}
+										onGenerate={(params) => handleFieldGenerate("scopeOut", params)}
+										referenceFields={getReferenceFieldsForTarget("scopeOut")}
+										defaultReferenceFieldKeys={projectFieldReferenceDefaults.scopeOut}
 									/>
 								</div>
 							</Col>
@@ -591,6 +777,9 @@ export function ProjectProfileManager() {
 								label="Architecture Overview"
 								content={form.getFieldValue("architectureOverview")}
 								onSave={(content) => handleFieldUpdate("architectureOverview", content)}
+								onGenerate={(params) => handleFieldGenerate("architectureOverview", params)}
+								referenceFields={getReferenceFieldsForTarget("architectureOverview")}
+								defaultReferenceFieldKeys={projectFieldReferenceDefaults.architectureOverview}
 							/>
 						</div>
 						<div style={{ marginBottom: 16 }}>
@@ -598,6 +787,9 @@ export function ProjectProfileManager() {
 								label="Data Models"
 								content={form.getFieldValue("dataModels")}
 								onSave={(content) => handleFieldUpdate("dataModels", content)}
+								onGenerate={(params) => handleFieldGenerate("dataModels", params)}
+								referenceFields={getReferenceFieldsForTarget("dataModels")}
+								defaultReferenceFieldKeys={projectFieldReferenceDefaults.dataModels}
 							/>
 						</div>
 						<div style={{ marginBottom: 16 }}>
@@ -605,6 +797,9 @@ export function ProjectProfileManager() {
 								label="Integrations"
 								content={form.getFieldValue("integrations")}
 								onSave={(content) => handleFieldUpdate("integrations", content)}
+								onGenerate={(params) => handleFieldGenerate("integrations", params)}
+								referenceFields={getReferenceFieldsForTarget("integrations")}
+								defaultReferenceFieldKeys={projectFieldReferenceDefaults.integrations}
 							/>
 						</div>
 						<div style={{ marginBottom: 16 }}>
@@ -612,6 +807,9 @@ export function ProjectProfileManager() {
 								label="Technology Stack"
 								content={form.getFieldValue("requiredTechStack")}
 								onSave={(content) => handleFieldUpdate("requiredTechStack", content)}
+								onGenerate={(params) => handleFieldGenerate("requiredTechStack", params)}
+								referenceFields={getReferenceFieldsForTarget("requiredTechStack")}
+								defaultReferenceFieldKeys={projectFieldReferenceDefaults.requiredTechStack}
 							/>
 						</div>
 						<div style={{ marginBottom: 16 }}>
@@ -619,6 +817,9 @@ export function ProjectProfileManager() {
 								label="Development Process"
 								content={form.getFieldValue("developmentProcess")}
 								onSave={(content) => handleFieldUpdate("developmentProcess", content)}
+								onGenerate={(params) => handleFieldGenerate("developmentProcess", params)}
+								referenceFields={getReferenceFieldsForTarget("developmentProcess")}
+								defaultReferenceFieldKeys={projectFieldReferenceDefaults.developmentProcess}
 							/>
 						</div>
 						<div>
@@ -626,6 +827,9 @@ export function ProjectProfileManager() {
 								label="Timeline & Milestones"
 								content={form.getFieldValue("timelineMilestones")}
 								onSave={(content) => handleFieldUpdate("timelineMilestones", content)}
+								onGenerate={(params) => handleFieldGenerate("timelineMilestones", params)}
+								referenceFields={getReferenceFieldsForTarget("timelineMilestones")}
+								defaultReferenceFieldKeys={projectFieldReferenceDefaults.timelineMilestones}
 							/>
 						</div>
 					</>
@@ -641,6 +845,9 @@ export function ProjectProfileManager() {
 								label="Risks & Constraints"
 								content={form.getFieldValue("riskFactors")}
 								onSave={(content) => handleFieldUpdate("riskFactors", content)}
+								onGenerate={(params) => handleFieldGenerate("riskFactors", params)}
+								referenceFields={getReferenceFieldsForTarget("riskFactors")}
+								defaultReferenceFieldKeys={projectFieldReferenceDefaults.riskFactors}
 							/>
 						</div>
 						<div style={{ marginBottom: 16 }}>
@@ -648,6 +855,9 @@ export function ProjectProfileManager() {
 								label="Operations Plan"
 								content={form.getFieldValue("operationsPlan")}
 								onSave={(content) => handleFieldUpdate("operationsPlan", content)}
+								onGenerate={(params) => handleFieldGenerate("operationsPlan", params)}
+								referenceFields={getReferenceFieldsForTarget("operationsPlan")}
+								defaultReferenceFieldKeys={projectFieldReferenceDefaults.operationsPlan}
 							/>
 						</div>
 						<div style={{ marginBottom: 16 }}>
@@ -655,6 +865,9 @@ export function ProjectProfileManager() {
 								label="Quality & Compliance"
 								content={form.getFieldValue("qualityCompliance")}
 								onSave={(content) => handleFieldUpdate("qualityCompliance", content)}
+								onGenerate={(params) => handleFieldGenerate("qualityCompliance", params)}
+								referenceFields={getReferenceFieldsForTarget("qualityCompliance")}
+								defaultReferenceFieldKeys={projectFieldReferenceDefaults.qualityCompliance}
 							/>
 						</div>
 						<div>
@@ -662,6 +875,9 @@ export function ProjectProfileManager() {
 								label="Dependencies"
 								content={form.getFieldValue("dependencies")}
 								onSave={(content) => handleFieldUpdate("dependencies", content)}
+								onGenerate={(params) => handleFieldGenerate("dependencies", params)}
+								referenceFields={getReferenceFieldsForTarget("dependencies")}
+								defaultReferenceFieldKeys={projectFieldReferenceDefaults.dependencies}
 							/>
 						</div>
 					</>
@@ -677,6 +893,9 @@ export function ProjectProfileManager() {
 								label="Environments"
 								content={form.getFieldValue("environments")}
 								onSave={(content) => handleFieldUpdate("environments", content)}
+								onGenerate={(params) => handleFieldGenerate("environments", params)}
+								referenceFields={getReferenceFieldsForTarget("environments")}
+								defaultReferenceFieldKeys={projectFieldReferenceDefaults.environments}
 							/>
 						</div>
 						<div style={{ marginBottom: 16 }}>
@@ -684,6 +903,9 @@ export function ProjectProfileManager() {
 								label="Deployment Strategy"
 								content={form.getFieldValue("deploymentStrategy")}
 								onSave={(content) => handleFieldUpdate("deploymentStrategy", content)}
+								onGenerate={(params) => handleFieldGenerate("deploymentStrategy", params)}
+								referenceFields={getReferenceFieldsForTarget("deploymentStrategy")}
+								defaultReferenceFieldKeys={projectFieldReferenceDefaults.deploymentStrategy}
 							/>
 						</div>
 						<div style={{ marginBottom: 16 }}>
@@ -691,6 +913,9 @@ export function ProjectProfileManager() {
 								label="Monitoring & Logging"
 								content={form.getFieldValue("monitoringAndLogging")}
 								onSave={(content) => handleFieldUpdate("monitoringAndLogging", content)}
+								onGenerate={(params) => handleFieldGenerate("monitoringAndLogging", params)}
+								referenceFields={getReferenceFieldsForTarget("monitoringAndLogging")}
+								defaultReferenceFieldKeys={projectFieldReferenceDefaults.monitoringAndLogging}
 							/>
 						</div>
 						<div style={{ marginBottom: 16 }}>
@@ -698,6 +923,9 @@ export function ProjectProfileManager() {
 								label="Maintenance Plan"
 								content={form.getFieldValue("maintenancePlan")}
 								onSave={(content) => handleFieldUpdate("maintenancePlan", content)}
+								onGenerate={(params) => handleFieldGenerate("maintenancePlan", params)}
+								referenceFields={getReferenceFieldsForTarget("maintenancePlan")}
+								defaultReferenceFieldKeys={projectFieldReferenceDefaults.maintenancePlan}
 							/>
 						</div>
 					</>

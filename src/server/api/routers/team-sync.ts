@@ -4,6 +4,7 @@ import { TeamSyncFacade } from "~/modules/team-sync/application/services/team-sy
 import { DrizzleTeamSyncRepository } from "~/modules/team-sync/infrastructure/repositories/drizzle-team-sync-repository";
 import { toDashboardViewModel } from "~/modules/team-sync/presentation/view-models/dashboard-view-model";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
+import { generateProjectMarkdownWithAI } from "~/server/services/project-markdown-generation";
 
 const createFacade = () => {
 	const repository = new DrizzleTeamSyncRepository();
@@ -114,6 +115,12 @@ const projectProfileInput = z.object({
 	),
 }));
 
+const projectMarkdownReferenceFieldSchema = z.object({
+	key: z.string().trim().min(1).max(64),
+	label: z.string().trim().min(1).max(120),
+	value: z.string().trim().min(1).max(6000),
+});
+
 export const teamSyncRouter = createTRPCRouter({
 	snapshot: publicProcedure
 		.input(
@@ -185,6 +192,25 @@ export const teamSyncRouter = createTRPCRouter({
 		.mutation(async ({ input }) => {
 			const repository = new DrizzleTeamSyncRepository();
 			return repository.updateProjectField(input.projectId, input.fieldName, input.content);
+		}),
+	generateProjectFieldMarkdown: publicProcedure
+		.input(
+			z.object({
+				targetField: projectMarkdownFieldSchema,
+				currentContent: z.string().max(8000).optional(),
+				prompt: z.string().trim().max(1000).optional(),
+				referenceFields: z.array(projectMarkdownReferenceFieldSchema).min(1).max(20),
+			}),
+		)
+		.mutation(async ({ input }) => {
+			const generatedContent = await generateProjectMarkdownWithAI({
+				targetField: input.targetField,
+				currentContent: input.currentContent,
+				prompt: input.prompt,
+				referenceFields: input.referenceFields,
+			});
+
+			return { generatedContent };
 		}),
 	createTeamMemberProfile: publicProcedure
 		.input(teamMemberProfileInput)

@@ -15,11 +15,13 @@ export const AI_GENERATION_CONFIG = {
         PROPOSAL_DRAFT: 3000,
         CHAT_REPLY: 1000,
         MEETING_ANALYSIS: 2000,
+        PROJECT_MARKDOWN: 1200,
     },
     CACHE_TTL_SECONDS: {
         PERSONA_ANALYSIS: 60 * 60 * 24,
         RFP_ANALYSIS: 60 * 60 * 24,
         PROPOSAL_DRAFT: 60 * 60 * 24,
         PROPOSAL_CHAT_REPLY: 60 * 10,
+        PROJECT_MARKDOWN: 60 * 30,
     },
 } as const;
