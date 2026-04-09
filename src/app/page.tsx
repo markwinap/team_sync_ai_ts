@@ -5,9 +5,7 @@ import { auth } from "~/server/auth";
 import { toDashboardViewModel } from "~/modules/team-sync/presentation/view-models/dashboard-view-model";
 
 export default async function Home() {
-	const facade = new TeamSyncFacade(new DrizzleTeamSyncRepository());
-	const [snapshot, session] = await Promise.all([facade.getSnapshot(), auth()]);
-	const viewModel = toDashboardViewModel(snapshot);
+	const [session] = await Promise.all([auth()]);
 	const user = session?.user
 		? {
 				name: session.user.name ?? null,
@@ -16,5 +14,5 @@ export default async function Home() {
 			}
 		: null;
 
-	return <TeamSyncDashboard data={viewModel} user={user} />;
+	return <TeamSyncDashboard user={user} />;
 }

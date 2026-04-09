@@ -199,14 +199,6 @@ export function CompanyProfileManager() {
 	return (
 		<section className={styles.panel}>
 			<div className={styles.profileSectionHeader}>
-				<div>
-					<Typography.Title level={2} style={{ marginBottom: 4 }}>
-						Company Profiles
-					</Typography.Title>
-					<Typography.Text type="secondary">
-						Manage company records stored in PostgreSQL.
-					</Typography.Text>
-				</div>
 				<Button type="primary" onClick={openCreateModal}>
 					Add Company
 				</Button>
