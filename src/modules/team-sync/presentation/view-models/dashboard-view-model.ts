@@ -35,7 +35,7 @@ export const toDashboardViewModel = (
 		summary: selected.requirement.summary,
 		teamRows: selected.team.recommendedTeam.map((candidate) => ({
 			name: candidate.member.fullName,
-			role: candidate.member.role,
+			role: candidate.member.roles.join(", "),
 			scorePercent: Math.round(candidate.score * 100),
 			reasons: candidate.reasons,
 		})),

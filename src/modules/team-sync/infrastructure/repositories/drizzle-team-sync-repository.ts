@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 
 import type {
 	CompanyProfileDraft,
@@ -8,6 +8,7 @@ import type {
 	ProjectRecord,
 	ProjectRequirement,
 	RequiredTeamRole,
+	TeamMemberLanguage,
 	TeamMemberProfileDraft,
 	TeamMember,
 } from "~/modules/team-sync/domain/entities";
@@ -26,12 +27,13 @@ const parseLegacyTeamRole = (value: string): RequiredTeamRole => {
 	const match = /^(.*)\(x(\d+)\)$/i.exec(trimmed);
 
 	if (!match) {
-		return { role: trimmed, headcount: 1 };
+		return { role: trimmed, headcount: 1, allocationPercent: 100 };
 	}
 
 	return {
 		role: match[1]?.trim() ?? trimmed,
 		headcount: Number(match[2]) || 1,
+		allocationPercent: 100,
 	};
 };
 
@@ -40,6 +42,7 @@ const normalizeRequiredTeamByRole = (value: RequiredTeamRole[]) =>
 		.map((item) => ({
 			role: item.role.trim(),
 			headcount: Number(item.headcount) || 0,
+			allocationPercent: Math.min(100, Math.max(25, Number(item.allocationPercent) || 100)),
 			assignedMemberId: item.assignedMemberId?.trim() || undefined,
 		}))
 		.filter((item) => item.role.length > 0 && item.headcount > 0);
@@ -168,14 +171,15 @@ export class DrizzleTeamSyncRepository implements TeamSyncRepository {
 		return members.map((member) => ({
 			id: member.id,
 			fullName: member.fullName,
-			role: member.role,
+			email: member.email,
+			roles: member.roles,
 			expertise: member.expertise,
 			techStack: member.techStack,
 			certifications: member.certifications,
 			responsibilities: member.responsibilities,
 			communicationStyle: member.communicationStyle,
 			growthGoals: member.growthGoals,
-			capacityPercent: member.capacityPercent,
+			languages: (member.languages ?? []) as TeamMemberLanguage[],
 		}));
 	}
 
@@ -188,14 +192,15 @@ export class DrizzleTeamSyncRepository implements TeamSyncRepository {
 		return members.map((member) => ({
 			id: member.id,
 			fullName: member.fullName,
-			role: member.role,
+			email: member.email,
+			roles: member.roles,
 			expertise: member.expertise,
 			techStack: member.techStack,
 			certifications: member.certifications,
 			responsibilities: member.responsibilities,
 			communicationStyle: member.communicationStyle,
 			growthGoals: member.growthGoals,
-			capacityPercent: member.capacityPercent,
+			languages: (member.languages ?? []) as TeamMemberLanguage[],
 		}));
 	}
 
@@ -207,14 +212,15 @@ export class DrizzleTeamSyncRepository implements TeamSyncRepository {
 			.values({
 				id: generatedId,
 				fullName: input.fullName,
-				role: input.role,
+				email: input.email,
+				roles: input.roles,
 				expertise: input.expertise,
 				techStack: input.techStack,
 				certifications: input.certifications,
 				responsibilities: input.responsibilities,
 				communicationStyle: input.communicationStyle,
 				growthGoals: input.growthGoals,
-				capacityPercent: input.capacityPercent,
+				languages: input.languages,
 			})
 			.returning();
 
@@ -225,14 +231,15 @@ export class DrizzleTeamSyncRepository implements TeamSyncRepository {
 		return {
 			id: created.id,
 			fullName: created.fullName,
-			role: created.role,
+			email: created.email,
+			roles: created.roles,
 			expertise: created.expertise,
 			techStack: created.techStack,
 			certifications: created.certifications,
 			responsibilities: created.responsibilities,
 			communicationStyle: created.communicationStyle,
 			growthGoals: created.growthGoals,
-			capacityPercent: created.capacityPercent,
+			languages: (created.languages ?? []) as TeamMemberLanguage[],
 		};
 	}
 
@@ -245,14 +252,15 @@ export class DrizzleTeamSyncRepository implements TeamSyncRepository {
 			.update(teamSyncTalentMembers)
 			.set({
 				fullName: input.fullName,
-				role: input.role,
+				email: input.email,
+				roles: input.roles,
 				expertise: input.expertise,
 				techStack: input.techStack,
 				certifications: input.certifications,
 				responsibilities: input.responsibilities,
 				communicationStyle: input.communicationStyle,
 				growthGoals: input.growthGoals,
-				capacityPercent: input.capacityPercent,
+				languages: input.languages,
 			})
 			.where(eq(teamSyncTalentMembers.id, memberId))
 			.returning();
@@ -264,15 +272,35 @@ export class DrizzleTeamSyncRepository implements TeamSyncRepository {
 		return {
 			id: updated.id,
 			fullName: updated.fullName,
-			role: updated.role,
+			email: updated.email,
+			roles: updated.roles,
 			expertise: updated.expertise,
 			techStack: updated.techStack,
 			certifications: updated.certifications,
 			responsibilities: updated.responsibilities,
 			communicationStyle: updated.communicationStyle,
 			growthGoals: updated.growthGoals,
-			capacityPercent: updated.capacityPercent,
+			languages: (updated.languages ?? []) as TeamMemberLanguage[],
 		};
+	}
+
+	async listProjectsByMemberId(memberId: string): Promise<Array<{ id: number; projectName: string; summary: string }>> {
+		const projects = await db
+			.select({
+				id: teamSyncProjects.id,
+				projectName: teamSyncProjects.projectName,
+				summary: teamSyncProjects.summary,
+			})
+			.from(teamSyncProjects)
+			.where(
+				sql`EXISTS (
+					SELECT 1 FROM jsonb_array_elements(${teamSyncProjects.requiredTeamByRole}) AS elem
+					WHERE elem->>'assignedMemberId' = ${memberId}
+				)`,
+			)
+			.orderBy(asc(teamSyncProjects.projectName));
+
+		return projects;
 	}
 
 	async deleteTeamMemberProfile(memberId: string): Promise<void> {

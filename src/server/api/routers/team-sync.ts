@@ -4,7 +4,10 @@ import { TeamSyncFacade } from "~/modules/team-sync/application/services/team-sy
 import { DrizzleTeamSyncRepository } from "~/modules/team-sync/infrastructure/repositories/drizzle-team-sync-repository";
 import { toDashboardViewModel } from "~/modules/team-sync/presentation/view-models/dashboard-view-model";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
-import { generateProjectMarkdownWithAI } from "~/server/services/project-markdown-generation";
+import {
+	generateProjectMarkdownWithAI,
+	generateProjectTeamRolesWithAI,
+} from "~/server/services/project-markdown-generation";
 
 const createFacade = () => {
 	const repository = new DrizzleTeamSyncRepository();
@@ -18,14 +21,22 @@ const csvArraySchema = z
 
 const teamMemberProfileInput = z.object({
 	fullName: z.string().trim().min(2).max(255),
-	role: z.string().trim().min(2).max(128),
+	email: z.string().trim().email().max(255).or(z.literal("")).default(""),
+	roles: csvArraySchema,
 	expertise: csvArraySchema,
 	techStack: csvArraySchema,
 	certifications: csvArraySchema,
 	responsibilities: csvArraySchema,
 	communicationStyle: z.string().trim().min(2).max(1000),
 	growthGoals: csvArraySchema,
-	capacityPercent: z.number().int().min(0).max(100),
+	languages: z
+		.array(
+			z.object({
+				language: z.string().trim().min(1).max(100),
+				percent: z.number().int().min(0).max(100),
+			}),
+		)
+		.default([]),
 });
 
 const companyProfileInput = z.object({
@@ -42,6 +53,7 @@ const requiredTeamByRoleSchema = z
 		z.object({
 			role: z.string().trim().min(1).max(128),
 			headcount: z.number().int().min(1).max(50),
+			allocationPercent: z.number().int().min(25).max(100).optional().default(100),
 			assignedMemberId: z.string().trim().min(1).max(64).optional(),
 		}),
 	)
@@ -51,6 +63,7 @@ const requiredTeamByRoleSchema = z
 			.map((item) => ({
 				role: item.role.trim(),
 				headcount: item.headcount,
+				allocationPercent: item.allocationPercent,
 				assignedMemberId: item.assignedMemberId?.trim() || undefined,
 			}))
 			.filter((item) => item.role.length > 0),
@@ -139,6 +152,12 @@ export const teamSyncRouter = createTRPCRouter({
 		const repository = new DrizzleTeamSyncRepository();
 		return repository.listTeamMemberProfiles();
 	}),
+	memberAssignedProjects: publicProcedure
+		.input(z.object({ memberId: z.string().trim().min(1).max(64) }))
+		.query(async ({ input }) => {
+			const repository = new DrizzleTeamSyncRepository();
+			return repository.listProjectsByMemberId(input.memberId);
+		}),
 	companyProfiles: publicProcedure.query(async () => {
 		const repository = new DrizzleTeamSyncRepository();
 		return repository.listCompanyProfiles();
@@ -211,6 +230,31 @@ export const teamSyncRouter = createTRPCRouter({
 			});
 
 			return { generatedContent };
+		}),
+	generateProjectTeamRoles: publicProcedure
+		.input(
+			z.object({
+				currentRoles: z
+					.array(
+						z.object({
+							role: z.string().trim().min(1).max(128),
+							headcount: z.number().int().min(1).max(50),
+							allocationPercent: z.number().int().min(25).max(100),
+						}),
+					)
+					.default([]),
+				prompt: z.string().trim().max(1000).optional(),
+				referenceFields: z.array(projectMarkdownReferenceFieldSchema).max(40).default([]),
+			}),
+		)
+		.mutation(async ({ input }) => {
+			const generatedRoles = await generateProjectTeamRolesWithAI({
+				currentRoles: input.currentRoles,
+				prompt: input.prompt,
+				referenceFields: input.referenceFields,
+			});
+
+			return { generatedRoles };
 		}),
 	createTeamMemberProfile: publicProcedure
 		.input(teamMemberProfileInput)

@@ -125,7 +125,7 @@ export function MarkdownEditableField({
 		>
 			<Typography.Text strong>{label}</Typography.Text>
 			<Space size={8}>
-				{!isEmpty ? (
+				{!isEditing && !isEmpty ? (
 					<ReadAloudButton size="small" text={renderedContent} />
 				) : null}
 				{!isEditing && !disabled && !readonly && !isEmpty ? (

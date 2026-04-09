@@ -239,7 +239,6 @@ export function CompanyProfileManager() {
 			<Modal
 				title={editingCompanyId ? "Edit Company" : "Add Company"}
 				open={isModalOpen}
-				forceRender
 				onCancel={closeModal}
 				footer={null}
 			>

@@ -189,6 +189,36 @@
 	backdrop-filter: blur(4px);
 }
 
+.memberProjectsList {
+	display: flex;
+	flex-direction: column;
+	gap: 0.65rem;
+	width: 100%;
+	min-height: 96px;
+}
+
+.memberProjectItem {
+	padding: 0 0 0.65rem;
+	border-bottom: 1px solid var(--border);
+}
+
+.memberProjectItem:last-child {
+	border-bottom: 0;
+	padding-bottom: 0;
+}
+
+.memberProjectSummary {
+	margin: 0.35rem 0 0;
+}
+
+.modalActionRow {
+	width: 100%;
+	justify-content: flex-end;
+	margin-top: 0.85rem;
+	padding-top: 0.75rem;
+	border-top: 1px solid var(--border);
+}
+
 @keyframes fadeIn {
 	from {
 		opacity: 0;

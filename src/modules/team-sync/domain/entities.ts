@@ -1,26 +1,33 @@
+export type TeamMemberLanguage = {
+	language: string;
+	percent: number;
+};
+
 export type TeamMember = {
 	id: string;
 	fullName: string;
-	role: string;
+	email: string;
+	roles: string[];
 	expertise: string[];
 	techStack: string[];
 	certifications: string[];
 	responsibilities: string[];
 	communicationStyle: string;
 	growthGoals: string[];
-	capacityPercent: number;
+	languages: TeamMemberLanguage[];
 };
 
 export type TeamMemberProfileDraft = {
 	fullName: string;
-	role: string;
+	email: string;
+	roles: string[];
 	expertise: string[];
 	techStack: string[];
 	certifications: string[];
 	responsibilities: string[];
 	communicationStyle: string;
 	growthGoals: string[];
-	capacityPercent: number;
+	languages: TeamMemberLanguage[];
 };
 
 export type CompanyProfile = {
@@ -41,6 +48,7 @@ export type CompanyRecord = CompanyProfile & {
 export type RequiredTeamRole = {
 	role: string;
 	headcount: number;
+	allocationPercent: number;
 	assignedMemberId?: string;
 };
 

@@ -7,6 +7,7 @@ import {
 	Col,
 	Form,
 	Input,
+	InputNumber,
 	Row,
 	Select,
 	Space,
@@ -31,6 +32,7 @@ type ProjectFormValues = {
 	requiredTeamByRole: {
 		role: string;
 		headcount: number;
+		allocationPercent: number;
 		assignedMemberId?: string;
 	}[];
 	companyId: number;
@@ -85,6 +87,19 @@ const defaultFormValues: ProjectFormValues = {
 
 const normalizeText = (value: string | null | undefined) => (value ?? "").trim();
 
+const normalizeRoles = (roles: string[] | null | undefined) =>
+	(roles ?? []).map((role) => normalizeText(role)).filter((role) => role.length > 0);
+
+const formatTeamMemberLabel = (member: { fullName: string; roles?: string[] | null }) => {
+	const roles = normalizeRoles(member.roles);
+
+	if (roles.length === 0) {
+		return member.fullName;
+	}
+
+	return `${member.fullName} (${roles.join(", ")})`;
+};
+
 type ProjectMarkdownField =
 	| "summary"
 	| "purpose"
@@ -137,6 +152,32 @@ const projectFieldReferenceDefaults: Record<ProjectMarkdownField, ProjectReferen
 	maintenancePlan: ["projectName", "deploymentStrategy", "monitoringAndLogging", "operationsPlan"],
 };
 
+const teamRoleGenerationReferenceKeys: ProjectReferenceFieldKey[] = [
+	"companyName",
+	"companyProfile",
+	"projectName",
+	"summary",
+	"purpose",
+	"businessGoals",
+	"stakeholders",
+	"scopeIn",
+	"scopeOut",
+	"architectureOverview",
+	"dataModels",
+	"integrations",
+	"requiredTechStack",
+	"developmentProcess",
+	"timelineMilestones",
+	"riskFactors",
+	"operationsPlan",
+	"qualityCompliance",
+	"dependencies",
+	"environments",
+	"deploymentStrategy",
+	"monitoringAndLogging",
+	"maintenancePlan",
+];
+
 const parseRequiredRole = (value: string) => {
 	const trimmedValue = value.trim();
 	const matched = /^(.*)\(x(\d+)\)$/i.exec(trimmedValue);
@@ -155,12 +196,20 @@ const parseRequiredRole = (value: string) => {
 };
 
 const normalizeRequiredTeamByRole = (
-	value: ProjectFormValues["requiredTeamByRole"] | undefined,
+	value:
+		| Array<{
+				role?: string;
+				headcount?: number;
+				allocationPercent?: number;
+				assignedMemberId?: string;
+		  }>
+		| undefined,
 ) =>
 	(value ?? [])
 		.map((entry) => ({
-			role: entry.role.trim(),
-			headcount: 1,
+			role: entry.role?.trim() ?? "",
+			headcount: Number(entry.headcount) || 1,
+			allocationPercent: Math.min(100, Math.max(25, Number(entry.allocationPercent) || 100)),
 			assignedMemberId: entry.assignedMemberId?.trim() || undefined,
 		}))
 		.filter((entry) => entry.role.length > 0);
@@ -168,7 +217,12 @@ const normalizeRequiredTeamByRole = (
 const formatRequiredRole = (entry: { role: string; headcount: number }) => entry.role;
 
 const resolveRequiredTeamByRole = (project: {
-	requiredTeamByRole?: { role: string; headcount: number; assignedMemberId?: string }[];
+	requiredTeamByRole?: {
+		role: string;
+		headcount: number;
+		allocationPercent?: number;
+		assignedMemberId?: string;
+	}[];
 	teamRoles: string[];
 }) => {
 	if ((project.requiredTeamByRole ?? []).length > 0) {
@@ -235,13 +289,13 @@ export function ProjectProfileManager() {
 	}));
 	const teamMemberOptions = teamMembers.map((member) => ({
 		value: member.id,
-		label: `${member.fullName} (${member.role})`,
+		label: formatTeamMemberLabel(member),
 	}));
 	const watchedFormValues = Form.useWatch([], form) as Partial<ProjectFormValues> | undefined;
 	const teamMemberNameById = useMemo(
 		() =>
 			new Map(
-				teamMembers.map((member) => [member.id, `${member.fullName} (${member.role})`] as const),
+				teamMembers.map((member) => [member.id, formatTeamMemberLabel(member)] as const),
 			),
 		[teamMembers],
 	);
@@ -250,8 +304,7 @@ export function ProjectProfileManager() {
 		const roleSet = new Set<string>();
 
 		for (const member of teamMembers) {
-			const role = member.role.trim();
-			if (role.length > 0) {
+			for (const role of normalizeRoles(member.roles)) {
 				roleSet.add(role);
 			}
 		}
@@ -290,6 +343,7 @@ export function ProjectProfileManager() {
 
 	const updateFieldMutation = api.teamSync.updateProjectField.useMutation();
 	const generateFieldMutation = api.teamSync.generateProjectFieldMarkdown.useMutation();
+	const generateTeamRolesMutation = api.teamSync.generateProjectTeamRoles.useMutation();
 
 	const projectReferenceFields = useMemo<MarkdownReferenceField[]>(() => {
 		const companyId = watchedFormValues?.companyId ?? 0;
@@ -312,8 +366,11 @@ export function ProjectProfileManager() {
 			const assignedLabel = entry.assignedMemberId
 				? teamMemberNameById.get(entry.assignedMemberId)
 				: undefined;
+			const allocationLabel = `${entry.allocationPercent}% allocation`;
 
-			return assignedLabel ? `- ${entry.role} (${assignedLabel})` : `- ${entry.role}`;
+			return assignedLabel
+				? `- ${entry.role} (${allocationLabel}; ${assignedLabel})`
+				: `- ${entry.role} (${allocationLabel})`;
 		});
 
 		return [
@@ -454,6 +511,35 @@ export function ProjectProfileManager() {
 
 		form.setFieldValue(fieldName, generated.generatedContent);
 		return generated.generatedContent;
+	};
+
+	const handleTeamRolesGenerate = async () => {
+		const currentRoles = normalizeRequiredTeamByRole(form.getFieldValue("requiredTeamByRole"));
+		const referenceFields = projectReferenceFields
+			.filter((field) => teamRoleGenerationReferenceKeys.includes(field.key as ProjectReferenceFieldKey))
+			.sort(
+				(left, right) =>
+					teamRoleGenerationReferenceKeys.indexOf(left.key as ProjectReferenceFieldKey) -
+					teamRoleGenerationReferenceKeys.indexOf(right.key as ProjectReferenceFieldKey),
+			)
+			.map((field) => ({
+				key: field.key,
+				label: field.label,
+				value: normalizeText(field.value),
+			}))
+			.filter((field) => field.value.length > 0);
+
+		const generated = await generateTeamRolesMutation.mutateAsync({
+			currentRoles,
+			prompt:
+				"Generate required delivery roles and allocation percentages using all provided project context sections. Allocation must be 25 to 100. Use 100 for always-required roles, 50 for partially required roles, and 25 for optional/advisory roles.",
+			referenceFields,
+		});
+
+		form.setFieldValue("requiredTeamByRole", generated.generatedRoles);
+		if (modalValidationMessage) {
+			setModalValidationMessage(null);
+		}
 	};
 
 	const isSubmitting = createMutation.isPending || updateMutation.isPending;
@@ -939,11 +1025,18 @@ export function ProjectProfileManager() {
 						<Form.List name="requiredTeamByRole">
 							{(fields, { add, remove }, { errors }) => (
 								<>
-									<Row justify="end" align="middle" style={{ marginBottom: 12 }}>
+									<Row justify="space-between" align="middle" style={{ marginBottom: 12 }}>
+										<Button
+											type="default"
+											onClick={() => void handleTeamRolesGenerate()}
+											loading={generateTeamRolesMutation.isPending}
+										>
+											Generate Roles with AI
+										</Button>
 										<Button
 											type="dashed"
 											icon={<PlusOutlined />}
-											onClick={() => add({ role: "", headcount: 1 })}
+											onClick={() => add({ role: "", headcount: 1, allocationPercent: 100 })}
 										>
 											Add Required Role
 										</Button>
@@ -960,9 +1053,8 @@ export function ProjectProfileManager() {
 												borderRadius: 10,
 											}}
 										>
-											<Col xs={24} md={11}>
+											<Col xs={24} md={8}>
 												<Form.Item
-													{...field}
 													label="Role"
 													name={[field.name, "role"]}
 													rules={[{ required: true, message: "Role is required" }]}
@@ -976,9 +1068,26 @@ export function ProjectProfileManager() {
 													/>
 												</Form.Item>
 											</Col>
-											<Col xs={24} md={11}>
+											<Col xs={24} md={6}>
 												<Form.Item
-													{...field}
+													label="Allocation %"
+													name={[field.name, "allocationPercent"]}
+													rules={[
+														{ required: true, message: "Allocation is required" },
+														{ type: "number", min: 25, max: 100, message: "Use a value from 25 to 100" },
+													]}
+												>
+													<InputNumber
+														min={25}
+														max={100}
+														style={{ width: "100%" }}
+														suffix="%"
+														placeholder="100"
+													/>
+												</Form.Item>
+											</Col>
+											<Col xs={24} md={8}>
+												<Form.Item
 													label="Optional Team Member"
 													name={[field.name, "assignedMemberId"]}
 												>
@@ -1073,9 +1182,15 @@ export function ProjectProfileManager() {
 				form={form}
 				onFinish={onSubmit}
 				onFinishFailed={onSubmitFailed}
-				okText={editingProjectId ? "Save Changes" : "Create Project"}
+				okText={
+					editingProjectId && activeTabKey === "team"
+						? "Save Team Roles"
+						: editingProjectId
+							? "Save Changes"
+							: "Create Project"
+				}
 				okButtonProps={
-					editingProjectId && activeTabKey !== "overview"
+					editingProjectId && activeTabKey !== "overview" && activeTabKey !== "team"
 						? { style: { display: "none" } }
 						: undefined
 				}

@@ -42,7 +42,6 @@ export function FormModal({
     return (
         <Modal
             open={open}
-            forceRender
             title={
                 <div>
                     <Flex align="center" gap={4}>

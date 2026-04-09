@@ -7,9 +7,8 @@ import {
 } from "~/modules/team-sync/domain/entities";
 import type { TeamSyncRepository } from "~/modules/team-sync/domain/repositories";
 
-const capacityWeight = 0.2;
-const roleWeight = 0.45;
-const stackWeight = 0.35;
+const roleWeight = 0.55;
+const stackWeight = 0.45;
 
 const markdownTextToList = (value: string) =>
 	value
@@ -36,7 +35,7 @@ export class BuildTeamAssignmentUseCase {
 			.slice(0, requirement.targetTeamSize);
 
 		const covered = new Set(
-			ranked.flatMap((entry) => [entry.member.role, ...entry.member.expertise].map(normalize)),
+			ranked.flatMap((entry) => [...entry.member.roles, ...entry.member.expertise].map(normalize)),
 		);
 
 		const uncoveredCapabilities = requiredRoles.filter(
@@ -55,22 +54,19 @@ export class BuildTeamAssignmentUseCase {
 		requiredRoles: string[],
 		requiredTechStack: string[],
 	): TeamAssignmentCandidate {
-		const roleFit = overlapScore(requiredRoles, [member.role, ...member.expertise]);
+		const roleFit = overlapScore(requiredRoles, [...member.roles, ...member.expertise]);
 		const stackFit = overlapScore(requiredTechStack, member.techStack);
-		const capacityFit = Math.max(0, Math.min(1, member.capacityPercent / 100));
 
 		const score = Number(
 			(
 				roleFit * roleWeight +
-				stackFit * stackWeight +
-				capacityFit * capacityWeight
+				stackFit * stackWeight
 			).toFixed(4),
 		);
 
 		const reasons = [
 			`Role fit ${(roleFit * 100).toFixed(0)}%`,
 			`Tech stack fit ${(stackFit * 100).toFixed(0)}%`,
-			`Available capacity ${member.capacityPercent}%`,
 		];
 
 		return {

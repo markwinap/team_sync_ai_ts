@@ -169,25 +169,31 @@ export const teamSyncProjects = createTable(
 	],
 );
 
+export type TeamMemberLanguage = {
+	language: string;
+	percent: number;
+};
+
 export const teamSyncTalentMembers = createTable(
 	"team_sync_talent_member",
 	(d) => ({
 		id: d.varchar({ length: 64 }).primaryKey(),
 		fullName: d.varchar({ length: 255 }).notNull(),
-		role: d.varchar({ length: 128 }).notNull(),
+		email: d.varchar({ length: 255 }).notNull().default(""),
+		roles: d.text().array().notNull().default([]),
 		expertise: d.text().array().notNull(),
 		techStack: d.text().array().notNull(),
 		certifications: d.text().array().notNull(),
 		responsibilities: d.text().array().notNull().default([]),
 		communicationStyle: d.text().notNull().default("Collaborative"),
 		growthGoals: d.text().array().notNull().default([]),
-		capacityPercent: d.integer().notNull(),
+		languages: d.jsonb().$type<TeamMemberLanguage[]>().notNull().default([]),
 		createdAt: d
 			.timestamp({ withTimezone: true })
 			.$defaultFn(() => /* @__PURE__ */ new Date())
 			.notNull(),
 	}),
-	(t) => [index("team_sync_talent_member_role_idx").on(t.role)],
+	() => [],
 );
 
 export const apiMetrics = createTable(
