@@ -4,11 +4,13 @@ import { useMemo, useState } from "react";
 import {
 	Alert,
 	Button,
+	Divider,
 	Form,
 	Input,
 	InputNumber,
 	Modal,
 	Popconfirm,
+	Select,
 	Space,
 	Table,
 	Tabs,
@@ -30,36 +32,51 @@ type LanguageEntry = {
 type ProfileFormValues = {
 	fullName: string;
 	email: string;
-	roles: string;
-	expertise: string;
-	techStack: string;
-	certifications: string;
-	responsibilities: string;
+	roles: string[];
+	expertise: string[];
+	techStack: string[];
+	certifications: string[];
+	responsibilities: string[];
 	communicationStyle: string;
-	growthGoals: string;
+	growthGoals: string[];
 	languages: LanguageEntry[];
 };
 
-const toArray = (value?: string | null) =>
-	(value ?? "")
-		.split(",")
-		.map((item) => item.trim())
-		.filter((item) => item.length > 0);
+const normalizeTagValues = (values?: string[] | null) =>
+	(values ?? []).map((item) => item.trim()).filter((item) => item.length > 0);
 
 const toText = (value?: string | null) => (value ?? "").trim();
 
 const defaultFormValues: ProfileFormValues = {
 	fullName: "",
 	email: "",
-	roles: "",
-	expertise: "",
-	techStack: "",
-	certifications: "",
-	responsibilities: "",
+	roles: [],
+	expertise: [],
+	techStack: [],
+	certifications: [],
+	responsibilities: [],
 	communicationStyle: "",
-	growthGoals: "",
+	growthGoals: [],
 	languages: [],
 };
+
+const mostSpokenLanguages = [
+	"English",
+	"Mandarin Chinese",
+	"Hindi",
+	"Spanish",
+	"French",
+	"Modern Standard Arabic",
+	"Bengali",
+	"Portuguese",
+	"Russian",
+	"Urdu",
+];
+
+const languageOptions = mostSpokenLanguages.map((language) => ({
+	label: language,
+	value: language,
+}));
 
 export function TeamMemberProfileManager() {
 	const utils = api.useUtils();
@@ -168,13 +185,13 @@ export function TeamMemberProfileManager() {
 		form.setFieldsValue({
 			fullName: profile.fullName,
 			email: profile.email,
-			roles: profile.roles.join(", "),
-			expertise: profile.expertise.join(", "),
-			techStack: profile.techStack.join(", "),
-			certifications: profile.certifications.join(", "),
-			responsibilities: profile.responsibilities.join(", "),
+			roles: profile.roles,
+			expertise: profile.expertise,
+			techStack: profile.techStack,
+			certifications: profile.certifications,
+			responsibilities: profile.responsibilities,
 			communicationStyle: profile.communicationStyle,
-			growthGoals: profile.growthGoals.join(", "),
+			growthGoals: profile.growthGoals,
 			languages: profile.languages,
 		});
 		setIsModalOpen(true);
@@ -191,13 +208,13 @@ export function TeamMemberProfileManager() {
 		const payload = {
 			fullName: toText(values.fullName),
 			email: toText(values.email),
-			roles: toArray(values.roles),
-			expertise: toArray(values.expertise),
-			techStack: toArray(values.techStack),
-			certifications: toArray(values.certifications),
-			responsibilities: toArray(values.responsibilities),
+			roles: normalizeTagValues(values.roles),
+			expertise: normalizeTagValues(values.expertise),
+			techStack: normalizeTagValues(values.techStack),
+			certifications: normalizeTagValues(values.certifications),
+			responsibilities: normalizeTagValues(values.responsibilities),
 			communicationStyle: toText(values.communicationStyle),
-			growthGoals: toArray(values.growthGoals),
+			growthGoals: normalizeTagValues(values.growthGoals),
 			languages: (values.languages ?? [])
 				.map((entry) => ({
 					language: toText(entry?.language),
@@ -290,21 +307,9 @@ export function TeamMemberProfileManager() {
 			title: "Actions",
 			key: "actions",
 			render: (_, profile) => (
-				<Space>
 					<Button size="small" type="primary" onClick={() => openEditModal(profile)}>
 						Edit
 					</Button>
-					<Popconfirm
-						title="Remove this profile?"
-						description="This action cannot be undone."
-						onConfirm={() => deleteMutation.mutate({ memberId: profile.id })}
-						okButtonProps={{ danger: true }}
-					>
-						<Button danger loading={isSubmitting} size="small" type="default">
-							Remove
-						</Button>
-					</Popconfirm>
-				</Space>
 			),
 		},
 	];
@@ -322,7 +327,7 @@ export function TeamMemberProfileManager() {
 							{!assignedProjectsQuery.isLoading && (assignedProjectsQuery.data?.length ?? 0) === 0 && (
 								<Typography.Text type="secondary">No projects assigned to this member.</Typography.Text>
 							)}
-							{(assignedProjectsQuery.data ?? []).map((project) => (
+							{(assignedProjectsQuery.data ?? []).map((project, index, source) => (
 								<div key={project.id} className={styles.memberProjectItem}>
 									<Typography.Text strong>{project.projectName}</Typography.Text>
 									<Typography.Paragraph
@@ -332,6 +337,7 @@ export function TeamMemberProfileManager() {
 									>
 										{project.summary}
 									</Typography.Paragraph>
+									{index < source.length - 1 && <Divider className={styles.memberProjectDivider} />}
 								</div>
 							))}
 						</div>
@@ -376,9 +382,10 @@ export function TeamMemberProfileManager() {
 				columns={columns}
 				dataSource={profiles}
 				loading={profilesQuery.isLoading}
+				style={{ width: "100%" }}
 				size="middle"
+				tableLayout="fixed"
 				pagination={{ pageSize: 8, showSizeChanger: false }}
-				scroll={{ x: 1100 }}
 			/>
 
 			{!profilesQuery.isLoading && profiles.length === 0 && (
@@ -417,8 +424,12 @@ export function TeamMemberProfileManager() {
 										<Form.Item label="Email" name="email" rules={[{ type: "email", message: "Enter a valid email" }]}>
 											<Input placeholder="jane@example.com" />
 										</Form.Item>
-										<Form.Item label="Roles (comma separated)" name="roles" rules={[{ required: true }]}>
-											<Input placeholder="Senior Engineer, Tech Lead" />
+											<Form.Item label="Roles" name="roles" rules={[{ required: true }]}>
+												<Select
+													mode="tags"
+													tokenSeparators={[","]}
+													placeholder="Add roles"
+												/>
 										</Form.Item>
 									</>
 								),
@@ -428,14 +439,26 @@ export function TeamMemberProfileManager() {
 								label: "Skills",
 								children: (
 									<>
-										<Form.Item label="Expertise (comma separated)" name="expertise" rules={[{ required: true }]}>
-											<Input placeholder="System architecture, API design" />
+											<Form.Item label="Expertise" name="expertise" rules={[{ required: true }]}>
+												<Select
+													mode="tags"
+													tokenSeparators={[","]}
+													placeholder="Add expertise"
+												/>
 										</Form.Item>
-										<Form.Item label="Tech Stack (comma separated)" name="techStack" rules={[{ required: true }]}>
-											<Input placeholder="TypeScript, PostgreSQL, AWS" />
+											<Form.Item label="Tech Stack" name="techStack" rules={[{ required: true }]}>
+												<Select
+													mode="tags"
+													tokenSeparators={[","]}
+													placeholder="Add technologies"
+												/>
 										</Form.Item>
-										<Form.Item label="Certifications (comma separated)" name="certifications">
-											<Input placeholder="AWS Solutions Architect" />
+											<Form.Item label="Certifications" name="certifications">
+												<Select
+													mode="tags"
+													tokenSeparators={[","]}
+													placeholder="Add certifications"
+												/>
 										</Form.Item>
 										<Form.Item label="Languages">
 											<Form.List name="languages">
@@ -449,7 +472,13 @@ export function TeamMemberProfileManager() {
 																	rules={[{ required: true, message: "Language required" }]}
 																	style={{ marginBottom: 0 }}
 																>
-																	<Input placeholder="English" style={{ width: 180 }} />
+																		<Select
+																			placeholder="Select language"
+																			options={languageOptions}
+																			style={{ width: 220 }}
+																			showSearch
+																			optionFilterProp="label"
+																		/>
 																</Form.Item>
 																<Form.Item
 																	{...restField}
@@ -457,10 +486,7 @@ export function TeamMemberProfileManager() {
 																	rules={[{ required: true, message: "%" }]}
 																	style={{ marginBottom: 0 }}
 																>
-																	<Space.Compact>
-																		<InputNumber min={0} max={100} placeholder="%" style={{ width: 80 }} />
-																		<Input disabled value="%" style={{ width: 44, textAlign: "center" }} />
-																	</Space.Compact>
+																		<InputNumber min={0} max={100} placeholder="%" style={{ width: 124 }} />
 																</Form.Item>
 																<MinusCircleOutlined onClick={() => remove(name)} />
 															</Space>
@@ -488,11 +514,19 @@ export function TeamMemberProfileManager() {
 										<Form.Item label="Communication Style" name="communicationStyle" rules={[{ required: true }]}>
 											<Input.TextArea rows={3} placeholder="Clear and async-friendly updates" />
 										</Form.Item>
-										<Form.Item label="Responsibilities (comma separated)" name="responsibilities" rules={[{ required: true }]}>
-											<Input placeholder="Guide architecture, coordinate integration" />
+											<Form.Item label="Responsibilities" name="responsibilities" rules={[{ required: true }]}>
+												<Select
+													mode="tags"
+													tokenSeparators={[","]}
+													placeholder="Add responsibilities"
+												/>
 										</Form.Item>
-										<Form.Item label="Growth Goals (comma separated)" name="growthGoals">
-											<Input placeholder="Increase mentoring impact" />
+											<Form.Item label="Growth Goals" name="growthGoals">
+												<Select
+													mode="tags"
+													tokenSeparators={[","]}
+													placeholder="Add growth goals"
+												/>
 										</Form.Item>
 									</>
 								),
@@ -503,6 +537,7 @@ export function TeamMemberProfileManager() {
 							forceRender: true,
 						}))}
 					/>
+					<Divider className={styles.modalActionDivider} />
 					<Space className={styles.modalActionRow}>
 						<Button onClick={closeModal}>Cancel</Button>
 						<Button

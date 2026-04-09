@@ -198,12 +198,10 @@
 }
 
 .memberProjectItem {
-	padding: 0 0 0.65rem;
-	border-bottom: 1px solid var(--border);
+	padding: 0;
 }
 
 .memberProjectItem:last-child {
-	border-bottom: 0;
 	padding-bottom: 0;
 }
 
@@ -211,12 +209,21 @@
 	margin: 0.35rem 0 0;
 }
 
+.memberProjectDivider {
+	margin: 0.8rem 0;
+	border-block-start: 1px solid var(--accent) !important;
+	opacity: 0.45;
+}
+
+.modalActionDivider {
+	margin: 0.9rem 0 0.75rem;
+	border-color: var(--border);
+}
+
 .modalActionRow {
 	width: 100%;
 	justify-content: flex-end;
-	margin-top: 0.85rem;
-	padding-top: 0.75rem;
-	border-top: 1px solid var(--border);
+	margin-top: 0;
 }
 
 @keyframes fadeIn {

@@ -11,6 +11,7 @@ import {
 	Row,
 	Select,
 	Space,
+	Table,
 	Tabs,
 	Typography,
 } from "antd";
@@ -18,7 +19,6 @@ import { MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 
 import styles from "~/app/team-sync.module.css";
-import { DataCard } from "~/app/_components/shared/data-card";
 import { FormModal } from "~/app/_components/shared/form-modal";
 import { MODAL_WIDTH_WIDE } from "~/app/_components/shared/modal-widths";
 import { SectionHeader } from "~/app/_components/shared/section-header";
@@ -1159,15 +1159,17 @@ export function ProjectProfileManager() {
 				/>
 			)}
 
-			<DataCard
-				title=""
+			<Table
 				rowKey="id"
 				columns={columns}
 				dataSource={projects}
 				loading={
 					projectsQuery.isLoading || companiesQuery.isLoading || teamMemberProfilesQuery.isLoading
 				}
-				pageSize={6}
+				style={{ width: "100%" }}
+				size="middle"
+				tableLayout="fixed"
+				pagination={{ pageSize: 6, showSizeChanger: false }}
 			/>
 
 			{!projectsQuery.isLoading && projects.length === 0 && (
