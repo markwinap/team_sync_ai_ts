@@ -17,12 +17,14 @@ import {
 	Tag,
 	Typography,
 } from "antd";
-import { MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
+import { EditOutlined, MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 
 import styles from "~/app/team-sync.module.css";
+import { MarkdownDisplay } from "~/app/_components/shared/markdown-display";
 import { SectionHeader } from "~/app/_components/shared/section-header";
 import { api } from "~/trpc/react";
+import { MODAL_WIDTH_WIDE } from "./shared/modal-widths";
 
 type LanguageEntry = {
 	language: string;
@@ -39,6 +41,7 @@ type ProfileFormValues = {
 	responsibilities: string[];
 	communicationStyle: string;
 	growthGoals: string[];
+	generatedSummary: string;
 	languages: LanguageEntry[];
 };
 
@@ -57,6 +60,7 @@ const defaultFormValues: ProfileFormValues = {
 	responsibilities: [],
 	communicationStyle: "",
 	growthGoals: [],
+	generatedSummary: "",
 	languages: [],
 };
 
@@ -86,6 +90,7 @@ export function TeamMemberProfileManager() {
 	const [searchValue, setSearchValue] = useState("");
 	const [activeTabKey, setActiveTabKey] = useState("identity");
 	const [validationMessage, setValidationMessage] = useState<string | null>(null);
+	const [generatedSummary, setGeneratedSummary] = useState<string | null>(null);
 	const profilesQuery = api.teamSync.teamMemberProfiles.useQuery();
 
 	const assignedProjectsQuery = api.teamSync.memberAssignedProjects.useQuery(
@@ -125,6 +130,12 @@ export function TeamMemberProfileManager() {
 		},
 	});
 
+	const generateSummaryMutation = api.teamSync.generateTeamMemberDecisionSummary.useMutation({
+		onError: (error) => {
+			setValidationMessage(`Unable to generate summary: ${error.message}`);
+		},
+	});
+
 	const isSubmitting =
 		createMutation.isPending ||
 		updateMutation.isPending ||
@@ -158,6 +169,10 @@ export function TeamMemberProfileManager() {
 		return filtered;
 	}, [profilesQuery.data, searchValue]);
 
+	const resetSummaryState = () => {
+		setGeneratedSummary(null);
+	};
+
 	const closeModal = () => {
 		if (createMutation.isPending || updateMutation.isPending) {
 			return;
@@ -166,6 +181,7 @@ export function TeamMemberProfileManager() {
 		setEditingMemberId(null);
 		setActiveTabKey("identity");
 		setValidationMessage(null);
+		resetSummaryState();
 		form.setFieldsValue(defaultFormValues);
 		setIsModalOpen(false);
 	};
@@ -174,6 +190,7 @@ export function TeamMemberProfileManager() {
 		setEditingMemberId(null);
 		setActiveTabKey("identity");
 		setValidationMessage(null);
+		resetSummaryState();
 		form.setFieldsValue(defaultFormValues);
 		setIsModalOpen(true);
 	};
@@ -182,6 +199,7 @@ export function TeamMemberProfileManager() {
 		setEditingMemberId(profile.id);
 		setActiveTabKey("identity");
 		setValidationMessage(null);
+		resetSummaryState();
 		form.setFieldsValue({
 			fullName: profile.fullName,
 			email: profile.email,
@@ -192,9 +210,44 @@ export function TeamMemberProfileManager() {
 			responsibilities: profile.responsibilities,
 			communicationStyle: profile.communicationStyle,
 			growthGoals: profile.growthGoals,
+			generatedSummary: profile.generatedSummary,
 			languages: profile.languages,
 		});
+		setGeneratedSummary(profile.generatedSummary || null);
 		setIsModalOpen(true);
+	};
+
+	const buildSummaryProfilePayload = () => {
+		const values = (form.getFieldsValue(true) ?? {}) as Partial<ProfileFormValues>;
+
+		return {
+			fullName: toText(values.fullName),
+			email: toText(values.email),
+			roles: normalizeTagValues(values.roles),
+			expertise: normalizeTagValues(values.expertise),
+			techStack: normalizeTagValues(values.techStack),
+			certifications: normalizeTagValues(values.certifications),
+			responsibilities: normalizeTagValues(values.responsibilities),
+			communicationStyle: toText(values.communicationStyle),
+			growthGoals: normalizeTagValues(values.growthGoals),
+			languages: (values.languages ?? [])
+				.map((entry) => ({
+					language: toText(entry?.language),
+					percent: Number(entry?.percent),
+				}))
+				.filter((entry) => entry.language.length > 0 && Number.isFinite(entry.percent)),
+		};
+	};
+
+	const onGenerateSummary = async () => {
+		setValidationMessage(null);
+		const result = await generateSummaryMutation.mutateAsync({
+			memberId: editingMemberId ?? undefined,
+			memberProfile: buildSummaryProfilePayload(),
+		});
+
+		setGeneratedSummary(result.summary);
+		form.setFieldValue("generatedSummary", result.summary);
 	};
 
 	const onSubmit = (values?: ProfileFormValues) => {
@@ -215,6 +268,7 @@ export function TeamMemberProfileManager() {
 			responsibilities: normalizeTagValues(values.responsibilities),
 			communicationStyle: toText(values.communicationStyle),
 			growthGoals: normalizeTagValues(values.growthGoals),
+			generatedSummary: toText(values.generatedSummary),
 			languages: (values.languages ?? [])
 				.map((entry) => ({
 					language: toText(entry?.language),
@@ -306,8 +360,14 @@ export function TeamMemberProfileManager() {
 		{
 			title: "Actions",
 			key: "actions",
+			align: "right",
 			render: (_, profile) => (
-					<Button size="small" type="primary" onClick={() => openEditModal(profile)}>
+					<Button
+						icon={<EditOutlined />}
+						type="link"
+						size="small"
+						onClick={() => openEditModal(profile)}
+					>
 						Edit
 					</Button>
 			),
@@ -376,6 +436,13 @@ export function TeamMemberProfileManager() {
 					title={`Failed to update profile: ${updateMutation.error.message}`}
 				/>
 			)}
+			{generateSummaryMutation.error && (
+				<Alert
+					showIcon
+					type="error"
+					title={`Failed to generate summary: ${generateSummaryMutation.error.message}`}
+				/>
+			)}
 
 			<Table
 				rowKey="id"
@@ -397,7 +464,7 @@ export function TeamMemberProfileManager() {
 				open={isModalOpen}
 				onCancel={closeModal}
 				footer={null}
-				width={640}
+				width={MODAL_WIDTH_WIDE}
 			>
 				<Form
 					layout="vertical"
@@ -529,6 +596,31 @@ export function TeamMemberProfileManager() {
 												/>
 										</Form.Item>
 									</>
+								),
+							},
+							{
+								key: "aiSummary",
+								label: "AI Summary",
+								children: (
+								<>
+									<Form.Item name="generatedSummary" style={{ display: "none" }}>
+										<Input type="hidden" />
+									</Form.Item>
+									<Space orientation="vertical" size={12} style={{ width: "100%" }}>
+										<Button
+											type="primary"
+											onClick={onGenerateSummary}
+											loading={generateSummaryMutation.isPending}
+										>
+											Generate AI Summary
+										</Button>
+										<div className={styles.memberDecisionSummaryPanel}>
+											<MarkdownDisplay
+												content={generatedSummary ?? "No summary generated yet."}
+											/>
+										</div>
+									</Space>
+								</>
 								),
 							},
 							...projectsTab,

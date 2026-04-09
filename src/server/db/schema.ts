@@ -188,6 +188,7 @@ export const teamSyncTalentMembers = createTable(
 		communicationStyle: d.text().notNull().default("Collaborative"),
 		growthGoals: d.text().array().notNull().default([]),
 		languages: d.jsonb().$type<TeamMemberLanguage[]>().notNull().default([]),
+		generatedSummary: d.text().notNull().default(""),
 		createdAt: d
 			.timestamp({ withTimezone: true })
 			.$defaultFn(() => /* @__PURE__ */ new Date())

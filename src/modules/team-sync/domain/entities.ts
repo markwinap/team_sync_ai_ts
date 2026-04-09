@@ -15,6 +15,7 @@ export type TeamMember = {
 	communicationStyle: string;
 	growthGoals: string[];
 	languages: TeamMemberLanguage[];
+	generatedSummary: string;
 };
 
 export type TeamMemberProfileDraft = {
@@ -28,6 +29,7 @@ export type TeamMemberProfileDraft = {
 	communicationStyle: string;
 	growthGoals: string[];
 	languages: TeamMemberLanguage[];
+	generatedSummary: string;
 };
 
 export type CompanyProfile = {

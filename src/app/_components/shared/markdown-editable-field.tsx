@@ -28,6 +28,7 @@ interface MarkdownEditableFieldProps {
 	}) => Promise<string | null | undefined | void>;
 	referenceFields?: MarkdownReferenceField[];
 	defaultReferenceFieldKeys?: string[];
+	defaultGeneratePrompt?: string;
 	readonly?: boolean;
 	disabled?: boolean;
 }
@@ -39,6 +40,7 @@ export function MarkdownEditableField({
 	onGenerate,
 	referenceFields = [],
 	defaultReferenceFieldKeys = [],
+	defaultGeneratePrompt = "",
 	readonly = false,
 	disabled = false,
 }: MarkdownEditableFieldProps) {
@@ -47,7 +49,8 @@ export function MarkdownEditableField({
 	const [editValue, setEditValue] = useState(content ?? "");
 	const [isSaving, setIsSaving] = useState(false);
 	const [isGenerating, setIsGenerating] = useState(false);
-	const [generatePrompt, setGeneratePrompt] = useState("");
+	const [isHovered, setIsHovered] = useState(false);
+	const [generatePrompt, setGeneratePrompt] = useState(defaultGeneratePrompt);
 	const [selectedReferenceFieldKeys, setSelectedReferenceFieldKeys] = useState<
 		string[]
 	>(defaultReferenceFieldKeys);
@@ -56,16 +59,22 @@ export function MarkdownEditableField({
 		setRenderedContent(content ?? "");
 	}, [content]);
 
+	useEffect(() => {
+		setGeneratePrompt(defaultGeneratePrompt);
+	}, [defaultGeneratePrompt]);
+
 	const isEmpty = renderedContent.trim() === "";
 	const hasChanges = editValue !== renderedContent;
 	const hasReferenceFields = referenceFields.length > 0;
 	const canGenerate = Boolean(onGenerate) && hasReferenceFields;
+	const showHeaderActions = isHovered && !isEditing && !isEmpty;
 
 	const handleEdit = () => {
 		setEditValue(renderedContent);
 		if (defaultReferenceFieldKeys.length > 0) {
 			setSelectedReferenceFieldKeys(defaultReferenceFieldKeys);
 		}
+		setGeneratePrompt(defaultGeneratePrompt);
 		setIsEditing(true);
 	};
 
@@ -123,8 +132,20 @@ export function MarkdownEditableField({
 				marginBottom: 8,
 			}}
 		>
-			<Typography.Text strong>{label}</Typography.Text>
-			<Space size={8}>
+			<Typography.Title
+				level={5}
+				style={{ margin: 0, color: "var(--ant-color-text, #f5f5f5)" }}
+			>
+				{label}
+			</Typography.Title>
+			<Space
+				size={8}
+				style={{
+					opacity: showHeaderActions ? 1 : 0,
+					visibility: showHeaderActions ? "visible" : "hidden",
+					transition: "opacity 0.15s ease",
+				}}
+			>
 				{!isEditing && !isEmpty ? (
 					<ReadAloudButton size="small" text={renderedContent} />
 				) : null}
@@ -144,7 +165,10 @@ export function MarkdownEditableField({
 
 	if (readonly || disabled) {
 		return (
-			<div>
+			<div
+				onMouseEnter={() => setIsHovered(true)}
+				onMouseLeave={() => setIsHovered(false)}
+			>
 				{header}
 				<MarkdownDisplay content={renderedContent} />
 			</div>
@@ -255,6 +279,8 @@ export function MarkdownEditableField({
 
 	return (
 		<div
+			onMouseEnter={() => setIsHovered(true)}
+			onMouseLeave={() => setIsHovered(false)}
 			style={{
 				padding: "8px 12px",
 				borderRadius: "4px",

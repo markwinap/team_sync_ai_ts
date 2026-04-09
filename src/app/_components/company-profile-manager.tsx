@@ -13,6 +13,7 @@ import {
 	Tag,
 	Typography,
 } from "antd";
+import { EditOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 
 import styles from "~/app/team-sync.module.css";
@@ -190,8 +191,14 @@ export function CompanyProfileManager() {
 		{
 			title: "Actions",
 			key: "actions",
+			align: "right",
 			render: (_, company) => (
-				<Button size="small" onClick={() => openEditModal(company)}>
+				<Button
+					icon={<EditOutlined />}
+					type="link"
+					size="small"
+					onClick={() => openEditModal(company)}
+				>
 					Edit
 				</Button>
 			),

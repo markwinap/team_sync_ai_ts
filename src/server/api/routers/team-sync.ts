@@ -8,6 +8,7 @@ import {
 	generateProjectMarkdownWithAI,
 	generateProjectTeamRolesWithAI,
 } from "~/server/services/project-markdown-generation";
+import { generateTeamMemberDecisionSummaryWithAI } from "~/server/services/team-member-decision-summary";
 
 const createFacade = () => {
 	const repository = new DrizzleTeamSyncRepository();
@@ -29,6 +30,7 @@ const teamMemberProfileInput = z.object({
 	responsibilities: csvArraySchema,
 	communicationStyle: z.string().trim().min(2).max(1000),
 	growthGoals: csvArraySchema,
+	generatedSummary: z.string().trim().max(12000).default(""),
 	languages: z
 		.array(
 			z.object({
@@ -36,6 +38,28 @@ const teamMemberProfileInput = z.object({
 				percent: z.number().int().min(0).max(100),
 			}),
 		)
+		.default([]),
+});
+
+const teamMemberSummaryProfileInput = z.object({
+	fullName: z.string().trim().max(255).optional().default(""),
+	email: z.string().trim().email().max(255).or(z.literal("")).optional().default(""),
+	roles: csvArraySchema.optional().default([]),
+	expertise: csvArraySchema.optional().default([]),
+	techStack: csvArraySchema.optional().default([]),
+	certifications: csvArraySchema.optional().default([]),
+	responsibilities: csvArraySchema.optional().default([]),
+	communicationStyle: z.string().trim().max(1000).optional().default(""),
+	growthGoals: csvArraySchema.optional().default([]),
+	generatedSummary: z.string().trim().max(12000).optional().default(""),
+	languages: z
+		.array(
+			z.object({
+				language: z.string().trim().max(100).optional().default(""),
+				percent: z.number().min(0).max(100).optional().default(0),
+			}),
+		)
+		.optional()
 		.default([]),
 });
 
@@ -272,6 +296,31 @@ export const teamSyncRouter = createTRPCRouter({
 		.mutation(async ({ input }) => {
 			const repository = new DrizzleTeamSyncRepository();
 			return repository.updateTeamMemberProfile(input.memberId, input.profile);
+		}),
+	generateTeamMemberDecisionSummary: publicProcedure
+		.input(
+			z.object({
+				memberId: z.string().trim().min(1).max(64).optional(),
+				memberProfile: teamMemberSummaryProfileInput.optional(),
+			}),
+		)
+		.mutation(async ({ input }) => {
+			const repository = new DrizzleTeamSyncRepository();
+			const members = await repository.listTeamMemberProfiles();
+			const persistedMember = input.memberId
+				? members.find((item) => item.id === input.memberId)
+				: undefined;
+			const memberProfile = input.memberProfile ?? persistedMember;
+
+			if (!memberProfile) {
+				throw new Error("Team member profile is required to generate a decision summary.");
+			}
+
+			const summary = await generateTeamMemberDecisionSummaryWithAI({
+				memberProfile,
+			});
+
+			return { summary };
 		}),
 	deleteTeamMemberProfile: publicProcedure
 		.input(

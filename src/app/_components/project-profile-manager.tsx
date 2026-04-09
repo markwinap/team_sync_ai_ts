@@ -5,6 +5,7 @@ import {
 	Alert,
 	Button,
 	Col,
+	Divider,
 	Form,
 	Input,
 	InputNumber,
@@ -15,7 +16,7 @@ import {
 	Tabs,
 	Typography,
 } from "antd";
-import { MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
+import { EditOutlined, MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 
 import styles from "~/app/team-sync.module.css";
@@ -150,6 +151,49 @@ const projectFieldReferenceDefaults: Record<ProjectMarkdownField, ProjectReferen
 	deploymentStrategy: ["projectName", "environments", "timelineMilestones", "requiredTechStack"],
 	monitoringAndLogging: ["projectName", "deploymentStrategy", "operationsPlan", "riskFactors"],
 	maintenancePlan: ["projectName", "deploymentStrategy", "monitoringAndLogging", "operationsPlan"],
+};
+
+const projectFieldGenerationInstructions: Record<ProjectMarkdownField, string> = {
+	summary:
+		"Output markdown only. Use this structure: '## Project Summary', a 2-4 sentence overview paragraph, then '### Key Outcomes' with 4-6 bullets. Each bullet must be specific to this project and include business value.",
+	purpose:
+		"Output markdown only. Use headings: '## Purpose', '### Problem Statement', '### Expected Impact'. Include one short paragraph per section and end with 3 measurable outcome bullets.",
+	businessGoals:
+		"Output markdown only. Use heading '## Business Goals' and 5-8 bullets. Format each bullet as: Goal, Metric/KPI, Target date (if known), and Value to business.",
+	stakeholders:
+		"Output markdown only. Use heading '## Stakeholders' and a bullet list. Format each bullet as: Stakeholder - primary concern - success criteria - decision authority.",
+	scopeIn:
+		"Output markdown only. Use heading '## In Scope' and grouped bullet lists by capability area. Each bullet must describe a testable deliverable, not a vague statement.",
+	scopeOut:
+		"Output markdown only. Use heading '## Out of Scope' and 5-10 bullets. Each bullet should clearly state an exclusion and, when relevant, whether it is deferred or permanently excluded.",
+	architectureOverview:
+		"Output markdown only. Use headings exactly: '## Architecture Overview', '### Architecture Style', '### Core Components', '### Data Flow', '### Integration Boundaries', '### Constraints'. Use concise bullets and concrete technologies when known.",
+	dataModels:
+		"Output markdown only. Use headings: '## Data Model', '### Core Entities', '### Relationships', '### Data Ownership', '### Lifecycle & Retention'. Prefer bullets and include key fields where useful.",
+	integrations:
+		"Output markdown only. Use heading '## Integrations' and one bullet per integration with this format: System, Purpose, Data Direction, Protocol/API, Failure Impact.",
+	requiredTechStack:
+		"Output markdown only. Use headings: '## Technology Stack', '### Frontend', '### Backend', '### Data', '### Infrastructure', '### Observability'. For each item include a short rationale.",
+	developmentProcess:
+		"Output markdown only. Use headings: '## Development Process', '### Delivery Phases', '### Ceremonies', '### Quality Gates', '### Release Cadence'. Keep it execution-focused and practical.",
+	timelineMilestones:
+		"Output markdown only. Use heading '## Timeline & Milestones' and a numbered list. Each item must include milestone name, objective, dependencies, and exit criteria.",
+	riskFactors:
+		"Output markdown only. Use heading '## Risks & Constraints' and bullets formatted as: Risk, Likelihood, Impact, Mitigation, Owner.",
+	operationsPlan:
+		"Output markdown only. Use headings: '## Operations Plan', '### Support Model', '### Incident Management', '### Ownership & Escalation', '### Readiness Checklist'. Keep responsibilities explicit.",
+	qualityCompliance:
+		"Output markdown only. Use headings: '## Quality & Compliance', '### Test Strategy', '### Acceptance Criteria', '### Security/Regulatory', '### Auditability'. Include concrete controls when possible.",
+	dependencies:
+		"Output markdown only. Use heading '## Dependencies' with bullets formatted as: Dependency, Owner, Needed By, Impact if Delayed, Mitigation.",
+	environments:
+		"Output markdown only. Use heading '## Environments' and a subsection for each environment (Dev, Test, Staging, Production). Include purpose, data policy, and promotion criteria.",
+	deploymentStrategy:
+		"Output markdown only. Use headings: '## Deployment Strategy', '### Release Approach', '### Validation', '### Rollback', '### Production Safeguards'. Prefer concrete steps over generic advice.",
+	monitoringAndLogging:
+		"Output markdown only. Use headings: '## Monitoring & Logging', '### Metrics', '### Logging', '### Alerts', '### Dashboards', '### Response Playbook'. Include examples of key signals.",
+	maintenancePlan:
+		"Output markdown only. Use headings: '## Maintenance Plan', '### Ownership', '### Patch & Upgrade Cadence', '### Dependency Management', '### Technical Debt', '### Continuous Improvement'. Include cadence and accountability.",
 };
 
 const teamRoleGenerationReferenceKeys: ProjectReferenceFieldKey[] = [
@@ -509,7 +553,6 @@ export function ProjectProfileManager() {
 			referenceFields: selectedReferenceFields,
 		});
 
-		form.setFieldValue(fieldName, generated.generatedContent);
 		return generated.generatedContent;
 	};
 
@@ -746,9 +789,15 @@ export function ProjectProfileManager() {
 		{
 			title: "Actions",
 			key: "actions",
+			align: "right",
 			render: (_, project) => (
 				<Space>
-					<Button size="small" onClick={() => openEditModal(project)}>
+					<Button
+						icon={<EditOutlined />}
+						type="link"
+						size="small"
+						onClick={() => openEditModal(project)}
+					>
 						Edit
 					</Button>
 				</Space>
@@ -812,8 +861,10 @@ export function ProjectProfileManager() {
 								onGenerate={(params) => handleFieldGenerate("businessGoals", params)}
 								referenceFields={getReferenceFieldsForTarget("businessGoals")}
 								defaultReferenceFieldKeys={projectFieldReferenceDefaults.businessGoals}
+								defaultGeneratePrompt={projectFieldGenerationInstructions.businessGoals}
 							/>
 						</div>
+						<Divider style={{ margin: "12px 0" }} />
 						<div style={{ marginBottom: 16 }}>
 							<MarkdownEditableField
 								label="Stakeholders"
@@ -822,8 +873,10 @@ export function ProjectProfileManager() {
 								onGenerate={(params) => handleFieldGenerate("stakeholders", params)}
 								referenceFields={getReferenceFieldsForTarget("stakeholders")}
 								defaultReferenceFieldKeys={projectFieldReferenceDefaults.stakeholders}
+								defaultGeneratePrompt={projectFieldGenerationInstructions.stakeholders}
 							/>
 						</div>
+						<Divider style={{ margin: "12px 0" }} />
 						<Row gutter={16}>
 							<Col xs={24}>
 								<div style={{ marginBottom: 16 }}>
@@ -834,8 +887,10 @@ export function ProjectProfileManager() {
 										onGenerate={(params) => handleFieldGenerate("scopeIn", params)}
 										referenceFields={getReferenceFieldsForTarget("scopeIn")}
 										defaultReferenceFieldKeys={projectFieldReferenceDefaults.scopeIn}
+										defaultGeneratePrompt={projectFieldGenerationInstructions.scopeIn}
 									/>
 								</div>
+								<Divider style={{ margin: "12px 0" }} />
 							</Col>
 							<Col xs={24}>
 								<div>
@@ -846,6 +901,7 @@ export function ProjectProfileManager() {
 										onGenerate={(params) => handleFieldGenerate("scopeOut", params)}
 										referenceFields={getReferenceFieldsForTarget("scopeOut")}
 										defaultReferenceFieldKeys={projectFieldReferenceDefaults.scopeOut}
+										defaultGeneratePrompt={projectFieldGenerationInstructions.scopeOut}
 									/>
 								</div>
 							</Col>
@@ -866,8 +922,10 @@ export function ProjectProfileManager() {
 								onGenerate={(params) => handleFieldGenerate("architectureOverview", params)}
 								referenceFields={getReferenceFieldsForTarget("architectureOverview")}
 								defaultReferenceFieldKeys={projectFieldReferenceDefaults.architectureOverview}
+								defaultGeneratePrompt={projectFieldGenerationInstructions.architectureOverview}
 							/>
 						</div>
+						<Divider style={{ margin: "12px 0" }} />
 						<div style={{ marginBottom: 16 }}>
 							<MarkdownEditableField
 								label="Data Models"
@@ -876,8 +934,10 @@ export function ProjectProfileManager() {
 								onGenerate={(params) => handleFieldGenerate("dataModels", params)}
 								referenceFields={getReferenceFieldsForTarget("dataModels")}
 								defaultReferenceFieldKeys={projectFieldReferenceDefaults.dataModels}
+								defaultGeneratePrompt={projectFieldGenerationInstructions.dataModels}
 							/>
 						</div>
+						<Divider style={{ margin: "12px 0" }} />
 						<div style={{ marginBottom: 16 }}>
 							<MarkdownEditableField
 								label="Integrations"
@@ -886,8 +946,10 @@ export function ProjectProfileManager() {
 								onGenerate={(params) => handleFieldGenerate("integrations", params)}
 								referenceFields={getReferenceFieldsForTarget("integrations")}
 								defaultReferenceFieldKeys={projectFieldReferenceDefaults.integrations}
+								defaultGeneratePrompt={projectFieldGenerationInstructions.integrations}
 							/>
 						</div>
+						<Divider style={{ margin: "12px 0" }} />
 						<div style={{ marginBottom: 16 }}>
 							<MarkdownEditableField
 								label="Technology Stack"
@@ -896,8 +958,10 @@ export function ProjectProfileManager() {
 								onGenerate={(params) => handleFieldGenerate("requiredTechStack", params)}
 								referenceFields={getReferenceFieldsForTarget("requiredTechStack")}
 								defaultReferenceFieldKeys={projectFieldReferenceDefaults.requiredTechStack}
+								defaultGeneratePrompt={projectFieldGenerationInstructions.requiredTechStack}
 							/>
 						</div>
+						<Divider style={{ margin: "12px 0" }} />
 						<div style={{ marginBottom: 16 }}>
 							<MarkdownEditableField
 								label="Development Process"
@@ -906,8 +970,10 @@ export function ProjectProfileManager() {
 								onGenerate={(params) => handleFieldGenerate("developmentProcess", params)}
 								referenceFields={getReferenceFieldsForTarget("developmentProcess")}
 								defaultReferenceFieldKeys={projectFieldReferenceDefaults.developmentProcess}
+								defaultGeneratePrompt={projectFieldGenerationInstructions.developmentProcess}
 							/>
 						</div>
+						<Divider style={{ margin: "12px 0" }} />
 						<div>
 							<MarkdownEditableField
 								label="Timeline & Milestones"
@@ -916,6 +982,7 @@ export function ProjectProfileManager() {
 								onGenerate={(params) => handleFieldGenerate("timelineMilestones", params)}
 								referenceFields={getReferenceFieldsForTarget("timelineMilestones")}
 								defaultReferenceFieldKeys={projectFieldReferenceDefaults.timelineMilestones}
+								defaultGeneratePrompt={projectFieldGenerationInstructions.timelineMilestones}
 							/>
 						</div>
 					</>
@@ -934,8 +1001,10 @@ export function ProjectProfileManager() {
 								onGenerate={(params) => handleFieldGenerate("riskFactors", params)}
 								referenceFields={getReferenceFieldsForTarget("riskFactors")}
 								defaultReferenceFieldKeys={projectFieldReferenceDefaults.riskFactors}
+								defaultGeneratePrompt={projectFieldGenerationInstructions.riskFactors}
 							/>
 						</div>
+						<Divider style={{ margin: "12px 0" }} />
 						<div style={{ marginBottom: 16 }}>
 							<MarkdownEditableField
 								label="Operations Plan"
@@ -944,8 +1013,10 @@ export function ProjectProfileManager() {
 								onGenerate={(params) => handleFieldGenerate("operationsPlan", params)}
 								referenceFields={getReferenceFieldsForTarget("operationsPlan")}
 								defaultReferenceFieldKeys={projectFieldReferenceDefaults.operationsPlan}
+								defaultGeneratePrompt={projectFieldGenerationInstructions.operationsPlan}
 							/>
 						</div>
+						<Divider style={{ margin: "12px 0" }} />
 						<div style={{ marginBottom: 16 }}>
 							<MarkdownEditableField
 								label="Quality & Compliance"
@@ -954,8 +1025,10 @@ export function ProjectProfileManager() {
 								onGenerate={(params) => handleFieldGenerate("qualityCompliance", params)}
 								referenceFields={getReferenceFieldsForTarget("qualityCompliance")}
 								defaultReferenceFieldKeys={projectFieldReferenceDefaults.qualityCompliance}
+								defaultGeneratePrompt={projectFieldGenerationInstructions.qualityCompliance}
 							/>
 						</div>
+						<Divider style={{ margin: "12px 0" }} />
 						<div>
 							<MarkdownEditableField
 								label="Dependencies"
@@ -964,6 +1037,7 @@ export function ProjectProfileManager() {
 								onGenerate={(params) => handleFieldGenerate("dependencies", params)}
 								referenceFields={getReferenceFieldsForTarget("dependencies")}
 								defaultReferenceFieldKeys={projectFieldReferenceDefaults.dependencies}
+								defaultGeneratePrompt={projectFieldGenerationInstructions.dependencies}
 							/>
 						</div>
 					</>
@@ -982,8 +1056,10 @@ export function ProjectProfileManager() {
 								onGenerate={(params) => handleFieldGenerate("environments", params)}
 								referenceFields={getReferenceFieldsForTarget("environments")}
 								defaultReferenceFieldKeys={projectFieldReferenceDefaults.environments}
+								defaultGeneratePrompt={projectFieldGenerationInstructions.environments}
 							/>
 						</div>
+						<Divider style={{ margin: "12px 0" }} />
 						<div style={{ marginBottom: 16 }}>
 							<MarkdownEditableField
 								label="Deployment Strategy"
@@ -992,8 +1068,10 @@ export function ProjectProfileManager() {
 								onGenerate={(params) => handleFieldGenerate("deploymentStrategy", params)}
 								referenceFields={getReferenceFieldsForTarget("deploymentStrategy")}
 								defaultReferenceFieldKeys={projectFieldReferenceDefaults.deploymentStrategy}
+								defaultGeneratePrompt={projectFieldGenerationInstructions.deploymentStrategy}
 							/>
 						</div>
+						<Divider style={{ margin: "12px 0" }} />
 						<div style={{ marginBottom: 16 }}>
 							<MarkdownEditableField
 								label="Monitoring & Logging"
@@ -1002,8 +1080,10 @@ export function ProjectProfileManager() {
 								onGenerate={(params) => handleFieldGenerate("monitoringAndLogging", params)}
 								referenceFields={getReferenceFieldsForTarget("monitoringAndLogging")}
 								defaultReferenceFieldKeys={projectFieldReferenceDefaults.monitoringAndLogging}
+								defaultGeneratePrompt={projectFieldGenerationInstructions.monitoringAndLogging}
 							/>
 						</div>
+						<Divider style={{ margin: "12px 0" }} />
 						<div style={{ marginBottom: 16 }}>
 							<MarkdownEditableField
 								label="Maintenance Plan"
@@ -1012,6 +1092,7 @@ export function ProjectProfileManager() {
 								onGenerate={(params) => handleFieldGenerate("maintenancePlan", params)}
 								referenceFields={getReferenceFieldsForTarget("maintenancePlan")}
 								defaultReferenceFieldKeys={projectFieldReferenceDefaults.maintenancePlan}
+								defaultGeneratePrompt={projectFieldGenerationInstructions.maintenancePlan}
 							/>
 						</div>
 					</>

@@ -180,6 +180,7 @@ export class DrizzleTeamSyncRepository implements TeamSyncRepository {
 			communicationStyle: member.communicationStyle,
 			growthGoals: member.growthGoals,
 			languages: (member.languages ?? []) as TeamMemberLanguage[],
+			generatedSummary: member.generatedSummary,
 		}));
 	}
 
@@ -201,6 +202,7 @@ export class DrizzleTeamSyncRepository implements TeamSyncRepository {
 			communicationStyle: member.communicationStyle,
 			growthGoals: member.growthGoals,
 			languages: (member.languages ?? []) as TeamMemberLanguage[],
+			generatedSummary: member.generatedSummary,
 		}));
 	}
 
@@ -221,6 +223,7 @@ export class DrizzleTeamSyncRepository implements TeamSyncRepository {
 				communicationStyle: input.communicationStyle,
 				growthGoals: input.growthGoals,
 				languages: input.languages,
+				generatedSummary: input.generatedSummary,
 			})
 			.returning();
 
@@ -240,6 +243,7 @@ export class DrizzleTeamSyncRepository implements TeamSyncRepository {
 			communicationStyle: created.communicationStyle,
 			growthGoals: created.growthGoals,
 			languages: (created.languages ?? []) as TeamMemberLanguage[],
+			generatedSummary: created.generatedSummary,
 		};
 	}
 
@@ -261,6 +265,7 @@ export class DrizzleTeamSyncRepository implements TeamSyncRepository {
 				communicationStyle: input.communicationStyle,
 				growthGoals: input.growthGoals,
 				languages: input.languages,
+				generatedSummary: input.generatedSummary,
 			})
 			.where(eq(teamSyncTalentMembers.id, memberId))
 			.returning();
@@ -281,6 +286,7 @@ export class DrizzleTeamSyncRepository implements TeamSyncRepository {
 			communicationStyle: updated.communicationStyle,
 			growthGoals: updated.growthGoals,
 			languages: (updated.languages ?? []) as TeamMemberLanguage[],
+			generatedSummary: updated.generatedSummary,
 		};
 	}
 

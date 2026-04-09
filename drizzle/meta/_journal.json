@@ -57,6 +57,20 @@
       "when": 1744214400000,
       "tag": "0007_team_member_profile_updates",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1775692800000,
+      "tag": "0008_team_member_generated_summary",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1775696400000,
+      "tag": "0009_fix_generated_summary_column_name",
+      "breakpoints": true
     }
   ]
 }

@@ -1,10 +1,8 @@
 "use client";
 
-import type { ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Typography } from "antd";
-import styles from "~/app/team-sync.module.css";
 
 interface MarkdownDisplayProps {
 	content: string | null | undefined;
@@ -17,10 +15,24 @@ export function MarkdownDisplay({ content, inline = false, className }: Markdown
 		return <Typography.Text type="secondary">No content</Typography.Text>;
 	}
 
+	const themedColors = {
+		text: "var(--text)",
+		muted: "var(--muted)",
+		accent: "var(--accent)",
+		border: "var(--border)",
+		panel: "var(--panel)",
+		panelSoft: "var(--panel-soft)",
+	};
+
 	const components = {
 		// Custom link rendering
 		a: ({ node, children, ...props }: any) => (
-			<a {...props} target="_blank" rel="noopener noreferrer" style={{ color: "#1890ff" }}>
+			<a
+				{...props}
+				target="_blank"
+				rel="noopener noreferrer"
+				style={{ color: themedColors.accent }}
+			>
 				{children}
 			</a>
 		),
@@ -29,9 +41,11 @@ export function MarkdownDisplay({ content, inline = false, className }: Markdown
 			<code
 				{...props}
 				style={{
-					backgroundColor: "#f5f5f5",
+					backgroundColor: themedColors.panelSoft,
+					color: themedColors.text,
 					padding: "2px 6px",
 					borderRadius: "2px",
+					border: `1px solid ${themedColors.border}`,
 					fontFamily: "monospace",
 					fontSize: "0.9em",
 				}}
@@ -41,22 +55,22 @@ export function MarkdownDisplay({ content, inline = false, className }: Markdown
 		),
 		// Custom heading rendering
 		h1: ({ node, children, ...props }: any) => (
-			<Typography.Title level={1} {...props}>
+			<Typography.Title level={1} {...props} style={{ color: themedColors.text }}>
 				{children}
 			</Typography.Title>
 		),
 		h2: ({ node, children, ...props }: any) => (
-			<Typography.Title level={2} {...props}>
+			<Typography.Title level={2} {...props} style={{ color: themedColors.text }}>
 				{children}
 			</Typography.Title>
 		),
 		h3: ({ node, children, ...props }: any) => (
-			<Typography.Title level={3} {...props}>
+			<Typography.Title level={3} {...props} style={{ color: themedColors.text }}>
 				{children}
 			</Typography.Title>
 		),
 		h4: ({ node, children, ...props }: any) => (
-			<Typography.Title level={4} {...props}>
+			<Typography.Title level={4} {...props} style={{ color: themedColors.text }}>
 				{children}
 			</Typography.Title>
 		),
@@ -67,6 +81,7 @@ export function MarkdownDisplay({ content, inline = false, className }: Markdown
 				style={{
 					marginLeft: "20px",
 					marginBottom: "10px",
+					color: themedColors.text,
 				}}
 			>
 				{children}
@@ -78,6 +93,7 @@ export function MarkdownDisplay({ content, inline = false, className }: Markdown
 				style={{
 					marginLeft: "20px",
 					marginBottom: "10px",
+					color: themedColors.text,
 				}}
 			>
 				{children}
@@ -87,11 +103,14 @@ export function MarkdownDisplay({ content, inline = false, className }: Markdown
 			<blockquote
 				{...props}
 				style={{
-					borderLeft: "4px solid #1890ff",
+					borderLeft: `4px solid ${themedColors.accent}`,
 					paddingLeft: "12px",
+					paddingTop: "6px",
+					paddingBottom: "6px",
+					background: themedColors.panelSoft,
 					marginLeft: "0",
 					marginBottom: "10px",
-					color: "#666",
+					color: themedColors.muted,
 				}}
 			>
 				{children}
@@ -99,7 +118,10 @@ export function MarkdownDisplay({ content, inline = false, className }: Markdown
 		),
 		// Custom paragraph rendering
 		p: ({ node, children, ...props }: any) => (
-			<Typography.Paragraph {...props} style={{ marginBottom: inline ? 0 : 8 }}>
+			<Typography.Paragraph
+				{...props}
+				style={{ marginBottom: inline ? 0 : 8, color: themedColors.text }}
+			>
 				{children}
 			</Typography.Paragraph>
 		),
@@ -110,7 +132,8 @@ export function MarkdownDisplay({ content, inline = false, className }: Markdown
 					style={{
 						width: "100%",
 						borderCollapse: "collapse",
-						border: "1px solid rgba(0, 0, 0, 0.15)",
+						border: `1px solid ${themedColors.border}`,
+						background: themedColors.panel,
 					}}
 				>
 					{children}
@@ -123,8 +146,9 @@ export function MarkdownDisplay({ content, inline = false, className }: Markdown
 				style={{
 					textAlign: "left",
 					padding: "8px",
-					border: "1px solid rgba(0, 0, 0, 0.15)",
-					backgroundColor: "rgba(0, 0, 0, 0.04)",
+					border: `1px solid ${themedColors.border}`,
+					backgroundColor: themedColors.panelSoft,
+					color: themedColors.text,
 				}}
 			>
 				{children}
@@ -135,8 +159,9 @@ export function MarkdownDisplay({ content, inline = false, className }: Markdown
 				{...props}
 				style={{
 					padding: "8px",
-					border: "1px solid rgba(0, 0, 0, 0.15)",
+					border: `1px solid ${themedColors.border}`,
 					verticalAlign: "top",
+					color: themedColors.text,
 				}}
 			>
 				{children}
@@ -145,7 +170,14 @@ export function MarkdownDisplay({ content, inline = false, className }: Markdown
 	};
 
 	return (
-		<div className={className} style={{ wordWrap: "break-word", overflowWrap: "break-word" }}>
+		<div
+			className={className}
+			style={{
+				wordWrap: "break-word",
+				overflowWrap: "break-word",
+				color: themedColors.text,
+			}}
+		>
 			<ReactMarkdown components={components} remarkPlugins={[remarkGfm]}>
 				{content}
 			</ReactMarkdown>

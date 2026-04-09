@@ -215,6 +215,14 @@
 	opacity: 0.45;
 }
 
+.memberDecisionSummaryPanel {
+	padding: 0.75rem;
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	background: var(--panel-soft);
+	min-height: 180px;
+}
+
 .modalActionDivider {
 	margin: 0.9rem 0 0.75rem;
 	border-color: var(--border);
