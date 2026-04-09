@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Space, Typography } from "antd";
+import { Button, Typography } from "antd";
 
 interface SectionHeaderProps {
     title: string;
@@ -18,7 +18,7 @@ export function SectionHeader({
     actionDisabled,
 }: SectionHeaderProps) {
     return (
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap", paddingBottom: 12 }}>
             <div>
                 <Typography.Title level={3} style={{ marginBottom: 4 }}>
                     {title}

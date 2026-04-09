@@ -18,6 +18,7 @@ import {
 import type { ColumnsType } from "antd/es/table";
 
 import styles from "~/app/team-sync.module.css";
+import { SectionHeader } from "~/app/_components/shared/section-header";
 import { api } from "~/trpc/react";
 
 type ProfileFormValues = {
@@ -253,28 +254,12 @@ export function TeamMemberProfileManager() {
 
 	return (
 		<section className={styles.panel}>
-			<div className={styles.profileSectionHeader}>
-				<div>
-					<Typography.Title level={2} style={{ marginBottom: 4 }}>
-						Team Member Profiles
-					</Typography.Title>
-					<Typography.Text type="secondary">
-						Manage profile records persisted in PostgreSQL.
-					</Typography.Text>
-				</div>
-				<Button type="primary" onClick={openCreateModal}>
-					Add Profile
-				</Button>
-			</div>
-
-			<div className={styles.profileToolbar}>
-				<Typography.Text strong>Search</Typography.Text>
-				<Input
-					placeholder="Search by name, role, expertise, tech, or style"
-					value={searchValue}
-					onChange={(event) => setSearchValue(event.target.value)}
-				/>
-			</div>
+			<SectionHeader
+				title="Team Member Profiles"
+				description="Manage profile records persisted in PostgreSQL."
+				actionLabel="Add Profile"
+				onAction={openCreateModal}
+			/>
 
 			{createMutation.error && (
 				<Alert
@@ -315,9 +300,9 @@ export function TeamMemberProfileManager() {
 			<Modal
 				title={editingMemberId ? "Edit Team Member Profile" : "Add Team Member Profile"}
 				open={isModalOpen}
+				forceRender
 				onCancel={closeModal}
 				footer={null}
-				destroyOnHidden
 			>
 				<Form
 					layout="vertical"

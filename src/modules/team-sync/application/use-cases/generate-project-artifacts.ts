@@ -4,8 +4,8 @@ import type {
 } from "~/modules/team-sync/domain/entities";
 import type { TeamSyncRepository } from "~/modules/team-sync/domain/repositories";
 
-const asStory = (projectName: string, capability: string, index: number) => {
-	return `As stakeholder ${index + 1}, I want ${capability.toLowerCase()} support in ${projectName}, so that delivery risk is reduced.`;
+const asStory = (projectName: string, scopeItem: string, index: number) => {
+	return `As stakeholder ${index + 1}, I want ${scopeItem.toLowerCase()} in ${projectName}, so that delivery risk is reduced.`;
 };
 
 const markdownTextToList = (value: string) =>
@@ -28,13 +28,13 @@ export class GenerateProjectArtifactsUseCase {
 	}
 
 	private createBundle(requirement: ProjectRequirement): ProjectArtifactBundle {
-		const requiredCapabilities = markdownTextToList(requirement.requiredCapabilities);
+		const scopeIn = markdownTextToList(requirement.scopeIn);
 		const riskFactors = markdownTextToList(requirement.riskFactors);
 
 		return {
 			functionalRequirements: [
-				...requiredCapabilities.map(
-					(capability) => `System must support ${capability.toLowerCase()} workflows.`,
+				...scopeIn.map(
+					(scopeItem) => `System must support ${scopeItem.toLowerCase()} workflows.`,
 				),
 				"System must produce a team assignment recommendation with rationale.",
 			],
@@ -43,8 +43,8 @@ export class GenerateProjectArtifactsUseCase {
 				"All generated project artifacts should be versioned and traceable.",
 				"Access control should enforce authenticated role-based access.",
 			],
-			userStories: requiredCapabilities.map((capability, index) =>
-				asStory(requirement.projectName, capability, index),
+			userStories: scopeIn.map((scopeItem, index) =>
+				asStory(requirement.projectName, scopeItem, index),
 			),
 			risksAndConstraints: [
 				...riskFactors,

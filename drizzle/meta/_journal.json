@@ -36,6 +36,13 @@
       "when": 1775713800000,
       "tag": "0004_project_profile_text_fields",
       "breakpoints": true
+	},
+	{
+	  "idx": 5,
+	  "version": "7",
+	  "when": 1775779200000,
+	  "tag": "0005_drop_required_capabilities",
+	  "breakpoints": true
     }
   ]
 }

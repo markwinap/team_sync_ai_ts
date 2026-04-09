@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Typography } from "antd";
 import styles from "~/app/team-sync.module.css";
 
@@ -102,11 +103,52 @@ export function MarkdownDisplay({ content, inline = false, className }: Markdown
 				{children}
 			</Typography.Paragraph>
 		),
+		table: ({ node, children, ...props }: any) => (
+			<div style={{ overflowX: "auto", marginBottom: inline ? 0 : 8 }}>
+				<table
+					{...props}
+					style={{
+						width: "100%",
+						borderCollapse: "collapse",
+						border: "1px solid rgba(0, 0, 0, 0.15)",
+					}}
+				>
+					{children}
+				</table>
+			</div>
+		),
+		th: ({ node, children, ...props }: any) => (
+			<th
+				{...props}
+				style={{
+					textAlign: "left",
+					padding: "8px",
+					border: "1px solid rgba(0, 0, 0, 0.15)",
+					backgroundColor: "rgba(0, 0, 0, 0.04)",
+				}}
+			>
+				{children}
+			</th>
+		),
+		td: ({ node, children, ...props }: any) => (
+			<td
+				{...props}
+				style={{
+					padding: "8px",
+					border: "1px solid rgba(0, 0, 0, 0.15)",
+					verticalAlign: "top",
+				}}
+			>
+				{children}
+			</td>
+		),
 	};
 
 	return (
 		<div className={className} style={{ wordWrap: "break-word", overflowWrap: "break-word" }}>
-			<ReactMarkdown components={components}>{content}</ReactMarkdown>
+			<ReactMarkdown components={components} remarkPlugins={[remarkGfm]}>
+				{content}
+			</ReactMarkdown>
 		</div>
 	);
 }

@@ -21,8 +21,8 @@ import { DataCard } from "~/app/_components/shared/data-card";
 import { FormModal } from "~/app/_components/shared/form-modal";
 import { MODAL_WIDTH_WIDE } from "~/app/_components/shared/modal-widths";
 import { SectionHeader } from "~/app/_components/shared/section-header";
-import { ProjectDetailModal } from "~/app/_components/project-detail-modal";
 import { api } from "~/trpc/react";
+import { MarkdownEditableField } from "./shared/markdown-editable-field";
 
 type ProjectFormValues = {
 	requiredTeamByRole: {
@@ -41,7 +41,6 @@ type ProjectFormValues = {
 	architectureOverview: string;
 	dataModels: string;
 	integrations: string;
-	requiredCapabilities: string;
 	requiredTechStack: string;
 	developmentProcess: string;
 	timelineMilestones: string;
@@ -68,7 +67,6 @@ const defaultFormValues: ProjectFormValues = {
 	architectureOverview: "",
 	dataModels: "",
 	integrations: "",
-	requiredCapabilities: "",
 	requiredTechStack: "",
 	developmentProcess: "",
 	timelineMilestones: "",
@@ -83,6 +81,28 @@ const defaultFormValues: ProjectFormValues = {
 };
 
 const normalizeText = (value: string | null | undefined) => (value ?? "").trim();
+
+type ProjectMarkdownField =
+	| "summary"
+	| "purpose"
+	| "businessGoals"
+	| "stakeholders"
+	| "scopeIn"
+	| "scopeOut"
+	| "architectureOverview"
+	| "dataModels"
+	| "integrations"
+	| "requiredTechStack"
+	| "developmentProcess"
+	| "timelineMilestones"
+	| "riskFactors"
+	| "operationsPlan"
+	| "qualityCompliance"
+	| "dependencies"
+	| "environments"
+	| "deploymentStrategy"
+	| "monitoringAndLogging"
+	| "maintenancePlan";
 
 const parseRequiredRole = (value: string) => {
 	const trimmedValue = value.trim();
@@ -147,7 +167,6 @@ export function ProjectProfileManager() {
 		architectureOverview: "architecture",
 		dataModels: "architecture",
 		integrations: "architecture",
-		requiredCapabilities: "architecture",
 		requiredTechStack: "architecture",
 		developmentProcess: "architecture",
 		timelineMilestones: "architecture",
@@ -235,6 +254,34 @@ export function ProjectProfileManager() {
 		},
 	});
 
+	const updateFieldMutation = api.teamSync.updateProjectField.useMutation();
+
+	const handleFieldUpdate = async (fieldName: ProjectMarkdownField, content: string) => {
+		form.setFieldValue(fieldName, content);
+
+		if (!editingProjectId) {
+			return content;
+		}
+
+		await updateFieldMutation.mutateAsync({
+			projectId: editingProjectId,
+			fieldName,
+			content,
+		});
+
+		utils.teamSync.projectProfiles.setData(undefined, (currentProjects) => {
+			if (!currentProjects) {
+				return currentProjects;
+			}
+
+			return currentProjects.map((project) =>
+				project.id === editingProjectId ? { ...project, [fieldName]: content } : project,
+			);
+		});
+
+		return content;
+	};
+
 	const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
 	const projects = useMemo(() => {
@@ -259,7 +306,6 @@ export function ProjectProfileManager() {
 				project.architectureOverview,
 				project.dataModels,
 				project.integrations,
-				project.requiredCapabilities,
 				project.requiredTechStack,
 				project.developmentProcess,
 				project.timelineMilestones,
@@ -317,7 +363,6 @@ export function ProjectProfileManager() {
 			architectureOverview: project.architectureOverview,
 			dataModels: project.dataModels,
 			integrations: project.integrations,
-			requiredCapabilities: project.requiredCapabilities,
 			requiredTechStack: project.requiredTechStack,
 			developmentProcess: project.developmentProcess,
 			timelineMilestones: project.timelineMilestones,
@@ -347,33 +392,37 @@ export function ProjectProfileManager() {
 
 	const onSubmit = (values: ProjectFormValues) => {
 		setModalValidationMessage(null);
-		const requiredTeamByRole = normalizeRequiredTeamByRole(values.requiredTeamByRole);
+		const currentValues = {
+			...defaultFormValues,
+			...form.getFieldsValue(true),
+			...values,
+		} as ProjectFormValues;
+		const requiredTeamByRole = normalizeRequiredTeamByRole(currentValues.requiredTeamByRole);
 
 		const payload = {
-			companyId: values.companyId,
-			projectName: normalizeText(values.projectName),
-			summary: values.summary,
-			purpose: values.purpose,
-			businessGoals: values.businessGoals,
-			stakeholders: values.stakeholders,
-			scopeIn: values.scopeIn,
-			scopeOut: values.scopeOut,
-			architectureOverview: values.architectureOverview,
-			dataModels: values.dataModels,
-			integrations: values.integrations,
-			requiredCapabilities: values.requiredCapabilities,
-			requiredTechStack: values.requiredTechStack,
-			developmentProcess: values.developmentProcess,
-			timelineMilestones: values.timelineMilestones,
-			riskFactors: values.riskFactors,
-			operationsPlan: values.operationsPlan,
-			qualityCompliance: values.qualityCompliance,
-			dependencies: values.dependencies,
+			companyId: currentValues.companyId,
+			projectName: normalizeText(currentValues.projectName),
+			summary: currentValues.summary,
+			purpose: currentValues.purpose,
+			businessGoals: currentValues.businessGoals,
+			stakeholders: currentValues.stakeholders,
+			scopeIn: currentValues.scopeIn,
+			scopeOut: currentValues.scopeOut,
+			architectureOverview: currentValues.architectureOverview,
+			dataModels: currentValues.dataModels,
+			integrations: currentValues.integrations,
+			requiredTechStack: currentValues.requiredTechStack,
+			developmentProcess: currentValues.developmentProcess,
+			timelineMilestones: currentValues.timelineMilestones,
+			riskFactors: currentValues.riskFactors,
+			operationsPlan: currentValues.operationsPlan,
+			qualityCompliance: currentValues.qualityCompliance,
+			dependencies: currentValues.dependencies,
 			requiredTeamByRole,
-			environments: values.environments,
-			deploymentStrategy: values.deploymentStrategy,
-			monitoringAndLogging: values.monitoringAndLogging,
-			maintenancePlan: values.maintenancePlan,
+			environments: currentValues.environments,
+			deploymentStrategy: currentValues.deploymentStrategy,
+			monitoringAndLogging: currentValues.monitoringAndLogging,
+			maintenancePlan: currentValues.maintenancePlan,
 		};
 
 		if (editingProjectId) {
@@ -435,26 +484,6 @@ export function ProjectProfileManager() {
 			),
 		},
 		{
-			title: "Capabilities",
-			dataIndex: "requiredCapabilities",
-			key: "requiredCapabilities",
-			render: (value: string) => (
-				<Typography.Text ellipsis={{ tooltip: value }} style={{ maxWidth: 240 }}>
-					{value}
-				</Typography.Text>
-			),
-		},
-		{
-			title: "Tech Stack",
-			dataIndex: "requiredTechStack",
-			key: "requiredTechStack",
-			render: (value: string) => (
-				<Typography.Text ellipsis={{ tooltip: value }} style={{ maxWidth: 240 }}>
-					{value}
-				</Typography.Text>
-			),
-		},
-		{
 			title: "Actions",
 			key: "actions",
 			render: (_, project) => (
@@ -466,6 +495,299 @@ export function ProjectProfileManager() {
 			),
 		},
 	];
+
+	const tabItems = [
+		{
+			key: "overview",
+			label: "Overview",
+			children: (
+				<>
+					<Row gutter={16}>
+						<Col xs={24} md={12}>
+							<Form.Item label="Company" name="companyId" rules={[{ required: true }]}>
+								<Select options={companyOptions} placeholder="Select company" />
+							</Form.Item>
+						</Col>
+						<Col xs={24} md={12}>
+							<Form.Item
+								label="Project Name"
+								name="projectName"
+								rules={[{ required: true, whitespace: true, message: "Project Name is required" }]}
+							>
+								<Input placeholder="Project title (markdown supported)" />
+							</Form.Item>
+						</Col>
+					</Row>
+					<Form.Item
+						label="Description"
+						name="summary"
+						rules={[{ required: true, whitespace: true, message: "Description is required" }]}
+					>
+						<Input.TextArea rows={4} placeholder="Project summary and context (markdown supported)" />
+					</Form.Item>
+					<Form.Item
+						label="Purpose"
+						name="purpose"
+						rules={[{ required: true, whitespace: true, message: "Purpose is required" }]}
+					>
+						<Input.TextArea rows={3} placeholder="Why this project exists (markdown supported)" />
+					</Form.Item>
+				</>
+			),
+		},
+	];
+
+	if (editingProjectId) {
+		tabItems.push(
+			{
+				key: "business",
+				label: "Business & Scope",
+				children: (
+					<>
+						<div style={{ marginBottom: 16 }}>
+							<MarkdownEditableField
+								label="Business Goals"
+								content={form.getFieldValue("businessGoals")}
+								onSave={(content) => handleFieldUpdate("businessGoals", content)}
+							/>
+						</div>
+						<div style={{ marginBottom: 16 }}>
+							<MarkdownEditableField
+								label="Stakeholders"
+								content={form.getFieldValue("stakeholders")}
+								onSave={(content) => handleFieldUpdate("stakeholders", content)}
+							/>
+						</div>
+						<Row gutter={16}>
+							<Col xs={24}>
+								<div style={{ marginBottom: 16 }}>
+									<MarkdownEditableField
+										label="Scope In"
+										content={form.getFieldValue("scopeIn")}
+										onSave={(content) => handleFieldUpdate("scopeIn", content)}
+									/>
+								</div>
+							</Col>
+							<Col xs={24}>
+								<div>
+									<MarkdownEditableField
+										label="Scope Out"
+										content={form.getFieldValue("scopeOut")}
+										onSave={(content) => handleFieldUpdate("scopeOut", content)}
+									/>
+								</div>
+							</Col>
+						</Row>
+					</>
+				),
+			},
+			{
+				key: "architecture",
+				label: "Architecture & Delivery",
+				children: (
+					<>
+						<div style={{ marginBottom: 16 }}>
+							<MarkdownEditableField
+								label="Architecture Overview"
+								content={form.getFieldValue("architectureOverview")}
+								onSave={(content) => handleFieldUpdate("architectureOverview", content)}
+							/>
+						</div>
+						<div style={{ marginBottom: 16 }}>
+							<MarkdownEditableField
+								label="Data Models"
+								content={form.getFieldValue("dataModels")}
+								onSave={(content) => handleFieldUpdate("dataModels", content)}
+							/>
+						</div>
+						<div style={{ marginBottom: 16 }}>
+							<MarkdownEditableField
+								label="Integrations"
+								content={form.getFieldValue("integrations")}
+								onSave={(content) => handleFieldUpdate("integrations", content)}
+							/>
+						</div>
+						<div style={{ marginBottom: 16 }}>
+							<MarkdownEditableField
+								label="Technology Stack"
+								content={form.getFieldValue("requiredTechStack")}
+								onSave={(content) => handleFieldUpdate("requiredTechStack", content)}
+							/>
+						</div>
+						<div style={{ marginBottom: 16 }}>
+							<MarkdownEditableField
+								label="Development Process"
+								content={form.getFieldValue("developmentProcess")}
+								onSave={(content) => handleFieldUpdate("developmentProcess", content)}
+							/>
+						</div>
+						<div>
+							<MarkdownEditableField
+								label="Timeline & Milestones"
+								content={form.getFieldValue("timelineMilestones")}
+								onSave={(content) => handleFieldUpdate("timelineMilestones", content)}
+							/>
+						</div>
+					</>
+				),
+			},
+			{
+				key: "risk",
+				label: "Risk & Operations",
+				children: (
+					<>
+						<div style={{ marginBottom: 16 }}>
+							<MarkdownEditableField
+								label="Risks & Constraints"
+								content={form.getFieldValue("riskFactors")}
+								onSave={(content) => handleFieldUpdate("riskFactors", content)}
+							/>
+						</div>
+						<div style={{ marginBottom: 16 }}>
+							<MarkdownEditableField
+								label="Operations Plan"
+								content={form.getFieldValue("operationsPlan")}
+								onSave={(content) => handleFieldUpdate("operationsPlan", content)}
+							/>
+						</div>
+						<div style={{ marginBottom: 16 }}>
+							<MarkdownEditableField
+								label="Quality & Compliance"
+								content={form.getFieldValue("qualityCompliance")}
+								onSave={(content) => handleFieldUpdate("qualityCompliance", content)}
+							/>
+						</div>
+						<div>
+							<MarkdownEditableField
+								label="Dependencies"
+								content={form.getFieldValue("dependencies")}
+								onSave={(content) => handleFieldUpdate("dependencies", content)}
+							/>
+						</div>
+					</>
+				),
+			},
+			{
+				key: "deployment",
+				label: "Deployment & Support",
+				children: (
+					<>
+						<div style={{ marginBottom: 16 }}>
+							<MarkdownEditableField
+								label="Environments"
+								content={form.getFieldValue("environments")}
+								onSave={(content) => handleFieldUpdate("environments", content)}
+							/>
+						</div>
+						<div style={{ marginBottom: 16 }}>
+							<MarkdownEditableField
+								label="Deployment Strategy"
+								content={form.getFieldValue("deploymentStrategy")}
+								onSave={(content) => handleFieldUpdate("deploymentStrategy", content)}
+							/>
+						</div>
+						<div style={{ marginBottom: 16 }}>
+							<MarkdownEditableField
+								label="Monitoring & Logging"
+								content={form.getFieldValue("monitoringAndLogging")}
+								onSave={(content) => handleFieldUpdate("monitoringAndLogging", content)}
+							/>
+						</div>
+						<div style={{ marginBottom: 16 }}>
+							<MarkdownEditableField
+								label="Maintenance Plan"
+								content={form.getFieldValue("maintenancePlan")}
+								onSave={(content) => handleFieldUpdate("maintenancePlan", content)}
+							/>
+						</div>
+					</>
+				),
+			},
+			{
+				key: "team",
+				label: "Team Size & Roles",
+				children: (
+					<>
+						<Form.List name="requiredTeamByRole">
+							{(fields, { add, remove }, { errors }) => (
+								<>
+									<Row justify="end" align="middle" style={{ marginBottom: 12 }}>
+										<Button
+											type="dashed"
+											icon={<PlusOutlined />}
+											onClick={() => add({ role: "", headcount: 1 })}
+										>
+											Add Required Role
+										</Button>
+									</Row>
+									{fields.map((field) => (
+										<Row
+											key={field.key}
+											gutter={[12, 0]}
+											align="middle"
+											style={{
+												marginBottom: 10,
+												padding: 12,
+												border: "1px solid rgba(255, 255, 255, 0.1)",
+												borderRadius: 10,
+											}}
+										>
+											<Col xs={24} md={11}>
+												<Form.Item
+													{...field}
+													label="Role"
+													name={[field.name, "role"]}
+													rules={[{ required: true, message: "Role is required" }]}
+												>
+													<Select
+														showSearch
+														options={roleOptions}
+														placeholder="Select role"
+														optionFilterProp="label"
+														notFoundContent="No roles available"
+													/>
+												</Form.Item>
+											</Col>
+											<Col xs={24} md={11}>
+												<Form.Item
+													{...field}
+													label="Optional Team Member"
+													name={[field.name, "assignedMemberId"]}
+												>
+													<Select
+														allowClear
+														showSearch
+														options={teamMemberOptions}
+														placeholder="Select profile"
+														optionFilterProp="label"
+														notFoundContent="No team profiles"
+													/>
+												</Form.Item>
+											</Col>
+											<Col xs={24} md={2}>
+												<Form.Item label=" " style={{ marginBottom: 0 }}>
+													<Button
+														type="text"
+														danger
+														icon={<MinusCircleOutlined />}
+														onClick={() => remove(field.name)}
+													/>
+												</Form.Item>
+											</Col>
+										</Row>
+									))}
+									<Form.ErrorList errors={errors} />
+								</>
+							)}
+						</Form.List>
+						<Typography.Text type="secondary">
+							You can optionally pre-assign a profile to each role from available team members.
+						</Typography.Text>
+					</>
+				),
+			},
+		);
+	}
 
 	return (
 		<section className={styles.panel}>
@@ -485,15 +807,6 @@ export function ProjectProfileManager() {
 				/>
 			)}
 
-			<div className={styles.profileToolbar}>
-				<Typography.Text strong>Search</Typography.Text>
-				<Input
-					placeholder="Search by project, purpose, capability, stakeholder, or risk"
-					value={searchValue}
-					onChange={(event) => setSearchValue(event.target.value)}
-				/>
-			</div>
-
 			{createMutation.error && (
 				<Alert
 					showIcon
@@ -510,7 +823,7 @@ export function ProjectProfileManager() {
 			)}
 
 			<DataCard
-				title="Project Portfolio"
+				title=""
 				rowKey="id"
 				columns={columns}
 				dataSource={projects}
@@ -533,6 +846,11 @@ export function ProjectProfileManager() {
 				onFinish={onSubmit}
 				onFinishFailed={onSubmitFailed}
 				okText={editingProjectId ? "Save Changes" : "Create Project"}
+				okButtonProps={
+					editingProjectId && activeTabKey !== "overview"
+						? { style: { display: "none" } }
+						: undefined
+				}
 				confirmLoading={createMutation.isPending || updateMutation.isPending}
 				subtitle="All project profile dimensions are editable from this form."
 			>
@@ -547,236 +865,9 @@ export function ProjectProfileManager() {
 							setModalValidationMessage(null);
 						}
 					}}
-					items={[
-						{
-							key: "overview",
-							label: "Overview",
-							children: (
-								<>
-									<Row gutter={16}>
-										<Col xs={24} md={12}>
-											<Form.Item label="Company" name="companyId" rules={[{ required: true }]}>
-												<Select options={companyOptions} placeholder="Select company" />
-											</Form.Item>
-										</Col>
-										<Col xs={24} md={12}>
-											<Form.Item
-												label="Project Name"
-												name="projectName"
-												rules={[{ required: true, whitespace: true, message: "Project Name is required" }]}
-											>
-												<Input placeholder="Project title (markdown supported)" />
-											</Form.Item>
-										</Col>
-									</Row>
-									<Form.Item
-										label="Description"
-										name="summary"
-										rules={[{ required: true, whitespace: true, message: "Description is required" }]}
-									>
-										<Input.TextArea rows={4} placeholder="Project summary and context (markdown supported)" />
-									</Form.Item>
-									<Form.Item
-										label="Purpose"
-										name="purpose"
-										rules={[{ required: true, whitespace: true, message: "Purpose is required" }]}
-									>
-										<Input.TextArea rows={3} placeholder="Why this project exists (markdown supported)" />
-									</Form.Item>
-								</>
-							),
-						},
-						{
-							key: "business",
-							label: "Business & Scope",
-							children: (
-								<>
-									<Form.Item label="Business Goals" name="businessGoals">
-										<Input.TextArea rows={4} placeholder="Markdown list, one item per line" />
-									</Form.Item>
-									<Form.Item label="Stakeholders" name="stakeholders">
-										<Input.TextArea rows={4} placeholder="Markdown list, one item per line" />
-									</Form.Item>
-									<Row gutter={16}>
-										<Col xs={24} md={12}>
-											<Form.Item label="Scope In" name="scopeIn">
-												<Input.TextArea rows={4} placeholder="Markdown list, one item per line" />
-											</Form.Item>
-										</Col>
-										<Col xs={24} md={12}>
-											<Form.Item label="Scope Out" name="scopeOut">
-												<Input.TextArea rows={4} placeholder="Markdown list, one item per line" />
-											</Form.Item>
-										</Col>
-									</Row>
-								</>
-							),
-						},
-						{
-							key: "architecture",
-							label: "Architecture & Delivery",
-							children: (
-								<>
-									<Form.Item label="Architecture Overview" name="architectureOverview">
-										<Input.TextArea rows={4} placeholder="Architecture direction and key patterns (markdown supported)" />
-									</Form.Item>
-									<Form.Item label="Data Models" name="dataModels">
-										<Input.TextArea rows={4} placeholder="Markdown list, one item per line" />
-									</Form.Item>
-									<Form.Item label="Integrations" name="integrations">
-										<Input.TextArea rows={4} placeholder="Markdown list, one item per line" />
-									</Form.Item>
-									<Form.Item label="Required Capabilities" name="requiredCapabilities">
-										<Input.TextArea rows={4} placeholder="Markdown list, one item per line" />
-									</Form.Item>
-									<Form.Item label="Technology Stack" name="requiredTechStack">
-										<Input.TextArea rows={4} placeholder="Markdown list, one item per line" />
-									</Form.Item>
-									<Form.Item label="Development Process" name="developmentProcess">
-										<Input.TextArea rows={4} placeholder="Delivery process, cadence, and governance (markdown supported)" />
-									</Form.Item>
-									<Form.Item label="Timeline & Milestones" name="timelineMilestones">
-										<Input.TextArea rows={4} placeholder="Markdown list, one item per line" />
-									</Form.Item>
-								</>
-							),
-						},
-						{
-							key: "risk",
-							label: "Risk & Operations",
-							children: (
-								<>
-									<Form.Item label="Risks & Constraints" name="riskFactors">
-										<Input.TextArea rows={4} placeholder="Markdown list, one item per line" />
-									</Form.Item>
-									<Form.Item label="Operations Plan" name="operationsPlan">
-										<Input.TextArea rows={4} placeholder="Operations model and ownership (markdown supported)" />
-									</Form.Item>
-									<Form.Item label="Quality & Compliance" name="qualityCompliance">
-										<Input.TextArea rows={4} placeholder="Markdown list, one item per line" />
-									</Form.Item>
-									<Form.Item label="Dependencies" name="dependencies">
-										<Input.TextArea rows={4} placeholder="Markdown list, one item per line" />
-									</Form.Item>
-								</>
-							),
-						},
-						{
-							key: "deployment",
-							label: "Deployment & Support",
-							children: (
-								<>
-									<Form.Item label="Environments" name="environments">
-										<Input.TextArea rows={4} placeholder="Markdown list, one item per line" />
-									</Form.Item>
-									<Form.Item label="Deployment Strategy" name="deploymentStrategy">
-										<Input.TextArea rows={4} placeholder="How releases are rolled out safely (markdown supported)" />
-									</Form.Item>
-									<Form.Item label="Monitoring & Logging" name="monitoringAndLogging">
-										<Input.TextArea rows={4} placeholder="Telemetry, dashboards, and alerting (markdown supported)" />
-									</Form.Item>
-									<Form.Item label="Maintenance Plan" name="maintenancePlan">
-										<Input.TextArea rows={4} placeholder="Ongoing maintenance and review cadence (markdown supported)" />
-									</Form.Item>
-									<Typography.Text type="secondary">
-										Team size is optional. Add roles only if needed.
-									</Typography.Text>
-								</>
-							),
-						},
-												{
-							key: "team",
-							label: "Team Size & Roles",
-							children: (
-								<>
-									<Form.List name="requiredTeamByRole">
-										{(fields, { add, remove }, { errors }) => (
-											<>
-												<Row justify="end" align="middle" style={{ marginBottom: 12 }}>
-													<Button
-														type="dashed"
-														icon={<PlusOutlined />}
-														onClick={() => add({ role: "", headcount: 1 })}
-													>
-														Add Required Role
-													</Button>
-												</Row>
-												{fields.map((field) => (
-													<Row
-														key={field.key}
-														gutter={[12, 0]}
-														align="middle"
-														style={{
-															marginBottom: 10,
-															padding: 12,
-															border: "1px solid rgba(255, 255, 255, 0.1)",
-															borderRadius: 10,
-														}}
-													>
-														<Col xs={24} md={11}>
-															<Form.Item
-																{...field}
-																label="Role"
-																name={[field.name, "role"]}
-																rules={[{ required: true, message: "Role is required" }]}
-															>
-																<Select
-																	showSearch
-																	options={roleOptions}
-																	placeholder="Select role"
-																	optionFilterProp="label"
-																	notFoundContent="No roles available"
-																/>
-															</Form.Item>
-														</Col>
-														<Col xs={24} md={11}>
-															<Form.Item
-																{...field}
-																label="Optional Team Member"
-																name={[field.name, "assignedMemberId"]}
-															>
-																<Select
-																	allowClear
-																	showSearch
-																	options={teamMemberOptions}
-																	placeholder="Select profile"
-																	optionFilterProp="label"
-																	notFoundContent="No team profiles"
-																/>
-															</Form.Item>
-														</Col>
-														<Col xs={24} md={2}>
-															<Form.Item label=" " style={{ marginBottom: 0 }}>
-																<Button
-																	type="text"
-																	danger
-																	icon={<MinusCircleOutlined />}
-																	onClick={() => remove(field.name)}
-																/>
-															</Form.Item>
-														</Col>
-													</Row>
-												))}
-												<Form.ErrorList errors={errors} />
-											</>
-										)}
-									</Form.List>
-									<Typography.Text type="secondary">
-										You can optionally pre-assign a profile to each role from available team members.
-									</Typography.Text>
-								</>
-							),
-						},
-					]}
+					items={tabItems}
 				/>
-
-			<ProjectDetailModal
-				open={viewingProject !== null}
-				onClose={() => setViewingProject(null)}
-				project={viewingProject}
-				companyName={viewingProject ? getCompanyNameForProject(viewingProject.companyId) : ""}
-			/>
-		</FormModal>
+			</FormModal>
 		</section>
 	);
 }

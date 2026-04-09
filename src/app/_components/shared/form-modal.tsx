@@ -2,6 +2,7 @@
 
 import { Flex, Modal, Form, Typography } from "antd";
 import type { FormInstance } from "antd";
+import type { ButtonProps } from "antd";
 import type { ReactNode } from "react";
 
 interface FormModalProps {
@@ -13,6 +14,7 @@ interface FormModalProps {
     onFinishFailed?: (errorInfo: any) => void;
     okText?: string;
     confirmLoading?: boolean;
+    okButtonProps?: ButtonProps;
     width?: Record<string, string>;
     centered?: boolean;
     subtitle?: ReactNode;
@@ -30,6 +32,7 @@ export function FormModal({
     onFinishFailed,
     okText = "Save",
     confirmLoading,
+    okButtonProps,
     width,
     centered = true,
     subtitle,
@@ -39,6 +42,7 @@ export function FormModal({
     return (
         <Modal
             open={open}
+            forceRender
             title={
                 <div>
                     <Flex align="center" gap={4}>
@@ -56,6 +60,7 @@ export function FormModal({
             onOk={() => form.submit()}
             okText={okText}
             confirmLoading={confirmLoading}
+            okButtonProps={okButtonProps}
             centered={centered}
             width={width}
         >

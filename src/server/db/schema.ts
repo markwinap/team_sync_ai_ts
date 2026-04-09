@@ -144,7 +144,6 @@ export const teamSyncProjects = createTable(
 		architectureOverview: d.text().notNull().default(""),
 		dataModels: d.text().notNull().default(""),
 		integrations: d.text().notNull().default(""),
-		requiredCapabilities: d.text().notNull().default(""),
 		requiredTechStack: d.text().notNull().default(""),
 		developmentProcess: d.text().notNull().default(""),
 		timelineMilestones: d.text().notNull().default(""),

@@ -55,7 +55,6 @@ export type ProjectRequirement = {
 	architectureOverview: string;
 	dataModels: string;
 	integrations: string;
-	requiredCapabilities: string;
 	requiredTechStack: string;
 	developmentProcess: string;
 	timelineMilestones: string;

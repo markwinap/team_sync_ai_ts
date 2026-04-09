@@ -16,6 +16,7 @@ import {
 import type { ColumnsType } from "antd/es/table";
 
 import styles from "~/app/team-sync.module.css";
+import { SectionHeader } from "~/app/_components/shared/section-header";
 import { api } from "~/trpc/react";
 
 type CompanyFormValues = {
@@ -199,20 +200,12 @@ export function CompanyProfileManager() {
 
 	return (
 		<section className={styles.panel}>
-			<div className={styles.profileSectionHeader}>
-				<Button type="primary" onClick={openCreateModal}>
-					Add Company
-				</Button>
-			</div>
-
-			<div className={styles.profileToolbar}>
-				<Typography.Text strong>Search</Typography.Text>
-				<Input
-					placeholder="Search by company, industry, standards, or partnerships"
-					value={searchValue}
-					onChange={(event) => setSearchValue(event.target.value)}
-				/>
-			</div>
+			<SectionHeader
+				title="Company Profiles"
+				description="Manage company records persisted in PostgreSQL."
+				actionLabel="Add Company"
+				onAction={openCreateModal}
+			/>
 
 			{createMutation.error && (
 				<Alert
@@ -246,9 +239,9 @@ export function CompanyProfileManager() {
 			<Modal
 				title={editingCompanyId ? "Edit Company" : "Add Company"}
 				open={isModalOpen}
+				forceRender
 				onCancel={closeModal}
 				footer={null}
-				destroyOnHidden
 			>
 				<Form
 					layout="vertical"
