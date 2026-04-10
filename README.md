@@ -6,89 +6,65 @@ Team Sync is an AI-powered project orchestration platform that intelligently bui
 
 ## Description
 
-Team Sync leverages artificial intelligence to streamline project planning and team allocation by connecting three core domains: company profiles, project requirements, and team member capabilities. 
+Team Sync connects three planning domains into one AI-assisted workflow:
 
-The platform automatically assigns the most suitable team members from a talent bank to new or existing projects, ensuring optimal alignment between skills, availability, and project needs. In parallel, it generates structured project artifacts such as functional requirements, user stories, system architecture, and risk assessments—accelerating project setup and improving consistency across initiatives.
+- Company profile context (industry, constraints, standards, and technical direction)
+- Project profile requirements (goals, scope, architecture, risks, timeline, and delivery model)
+- Team member capabilities (skills, certifications, roles, and availability)
 
-By integrating organizational data with AI-driven insights, Team Sync reduces manual effort, enhances decision-making, and enables teams to start projects faster with greater clarity and precision.
+Using this combined context, the platform recommends team allocation and generates project-ready documentation. The result is faster project setup, clearer role alignment, and more consistent planning outputs.
 
 ---
 
 ## Project Features
 
 ### 🤖 AI-Powered Team Assignment
-- Automatically matches team members to projects based on:
-  - Expertise & specialization  
-  - Technical stack proficiency  
-  - Certifications & credentials  
-  - Availability & capacity  
-- Optimizes team composition for efficiency and performance  
-- Supports assignment for both new and existing projects  
+- Suggests team assignments based on role fit, skills, certifications, and capacity
+- Supports both greenfield project staffing and existing project re-planning
+- Balances practical constraints such as required roles and allocation percentages
 
 ---
 
 ### 📄 Intelligent Project Generation
-- Generates structured project documentation, including:
-  - Functional Requirements  
-  - Non-functional Requirements  
-  - User Stories / Use Cases  
-  - Risks & Constraints  
-  - System Architecture (high-level)
-  - Scope (in/out)
-- Ensures completeness and consistency across all project artifacts  
+- Generates structured artifacts from project and organizational context
+- Covers functional/non-functional requirements, stories/use cases, risks, and architecture direction
+- Improves consistency and completeness across project documents
 
 ---
 
 ### 🧩 Domain-Driven Data Modeling
 
 #### Company Profile
-- Name, industry, and partnerships  
-- Technology intent and development stacks  
-- Certifications, standards, and compliance  
+- Organization identity, domain context, technology direction, and compliance constraints
 
 #### Project Profile
-- Project name, description, and purpose  
-- Business goals and stakeholders  
-- Scope definition (in/out)  
-- Architecture, data models, and integrations  
-- Technology stack and development process  
-- Timeline, milestones, risks, and operations
-- Quality & Compliance
-- Dependencies & Integrations
-- Team & Roles
-- Timeline & Milestones
-- Risks & Constraints
-- Deployment & Operations, Environments (dev, staging, prod), Deployment strategy, Monitoring & logging, Maintenance plan
+- Goals, stakeholders, and scope boundaries
+- Architecture, integrations, dependencies, and technology stack
+- Delivery details such as timeline, environments, operations, and risk controls
 
 #### Team Member Profile
-- Expertise and specialization  
-- Technical skills and certifications  
-- Responsibilities and contributions  
-- Communication and collaboration style  
-- Availability, capacity, and growth goals  
+- Expertise, role coverage, technical skills, and certifications
+- Capacity, collaboration preferences, and growth direction
 
 ---
 
-### ⚙️ Talent Bank Integration
-- Centralized repository of team member profiles  
-- Enables dynamic and scalable team allocation  
-- Continuously updated with performance and skill data  
+### ⚙️ Talent Bank and Profile Management
+- Centralized profile management for company, project, and team-member data
+- Supports iterative updates as project context evolves
+- Enables repeatable planning workflows across multiple initiatives
 
 ---
 
 ### 📊 Enhanced Decision-Making
-- Data-driven recommendations for:
-  - Team composition  
-  - Project structure  
-  - Risk mitigation  
-- Improves planning accuracy and delivery outcomes  
+- Surfaces AI-backed recommendations for team composition and project structure
+- Helps identify planning risks earlier and improve delivery confidence
 
 ---
 
 ### 🚀 Productivity Acceleration
-- Reduces manual effort in project setup  
-- Speeds up onboarding and planning phases  
-- Enables teams to focus on execution rather than preparation  
+- Reduces manual setup effort in early project phases
+- Shortens onboarding-to-execution time with ready-to-use artifacts
+- Lets teams spend more time delivering and less time drafting baseline plans
 
 ---
 
@@ -102,10 +78,10 @@ By integrating organizational data with AI-driven insights, Team Sync reduces ma
 | Database | PostgreSQL via [Drizzle ORM](https://orm.drizzle.team) |
 | UI | [Ant Design 6](https://ant.design) |
 | Auth | [NextAuth.js v5](https://next-auth.js.org) (GitHub OAuth) |
-| AI — Persona & Proposal | OpenAI-compatible endpoint (configurable) |
+| AI — Persona & Proposal | OpenAI-compatible provider (configurable base URL/model) |
 | AI — Meeting & Comms | [Google Gemini](https://ai.google.dev) (summary, analysis, generation, translation) |
 | AI — Transcription | [AssemblyAI](https://www.assemblyai.com) (real-time WebSocket streaming) |
-| Package Manager | pnpm 10 |
+| Package Manager | npm |
 
 ---
 
@@ -114,7 +90,7 @@ By integrating organizational data with AI-driven insights, Team Sync reduces ma
 ### Prerequisites
 
 - Node.js 20+
-- pnpm 10+
+- npm 10+
 - A running PostgreSQL instance (see `start-database.sh` for a Docker-based local setup)
 
 ### Environment Variables
@@ -170,75 +146,61 @@ npm run db:studio      # Open Drizzle Studio to browse the database
 ```text
 src/
   app/
+    api/
+      auth/[...nextauth]/
+      trpc/[trpc]/
     _components/
-      team-sync-dashboard.tsx      # Presentation-only UI component
-    page.tsx                       # Composition root for the home screen
+      team-sync-dashboard.tsx
+      company-profile-manager.tsx
+      project-profile-manager.tsx
+      team-member-profile-manager.tsx
+    page.tsx
+    layout.tsx
     team-sync.module.css
   modules/
     team-sync/
-      domain/
-        entities.ts                # Core business entities and scoring utilities
-        repositories.ts            # Repository contracts (ports)
       application/
-        use-cases/
-          build-team-assignment.ts
-          generate-project-artifacts.ts
         services/
-          team-sync-facade.ts      # Use-case orchestration layer
+        use-cases/
+      domain/
       infrastructure/
-        repositories/
-          drizzle-team-sync-repository.ts
       presentation/
-        view-models/
-          dashboard-view-model.ts  # Maps domain output to UI shape
+  lib/
+    normalize.ts
   server/
     api/
       routers/
-        team-sync.ts               # tRPC endpoint exposing Team Sync snapshot
       root.ts
+      trpc.ts
+    auth/
+      config.ts
+      index.ts
+    db/
+      index.ts
+      schema.ts
     services/
       persona-analysis.ts
       proposal-analysis.ts
+      proposal-chat.ts
       meeting-notes.ts
+      team-member-matching.ts
+      project-markdown-generation.ts
       translation.ts
+      gemini-client.ts
+      response-cache.ts
+  trpc/
+    react.tsx
+    server.ts
+    query-client.ts
+```
+
+Top-level support directories:
+
+```text
+drizzle/             # SQL migrations
+public/              # Static assets
+scripts/             # Utility scripts
+styles/globals.css   # Global styles
 ```
 
 ---
-
-## Architecture Notes (Clean Architecture)
-
-- Domain layer contains pure business types and rules with no framework dependencies.
-- Application layer implements use cases and orchestration logic.
-- Infrastructure layer provides data/provider adapters and can be swapped later.
-- Presentation layer maps use-case outputs into UI-focused view models.
-- UI components in `src/app` only render data; they do not implement business rules.
-
----
-
-## Existing Component Scan and Evaluation
-
-### Already Existing and Reusable
-
-- `src/server/services/*` already includes substantial AI orchestration and prompt logic for persona/proposal/meeting workflows.
-- `src/server/api/trpc.ts` is a good shared API boundary with auth-aware procedures.
-- `src/server/db/schema.ts` and auth config provide stable persistence/auth foundations.
-
-### Gaps Found Before Generation
-
-- Home UI was still default template content and did not reflect product capabilities.
-- API routers only exposed example post operations.
-- Business logic and feature boundaries were not grouped by domain module.
-
-### What Was Generated
-
-- A new `modules/team-sync` vertical slice with domain, application, infrastructure, and presentation layers.
-- A `teamSync` tRPC router endpoint exposing a typed feature snapshot.
-- A dashboard page and reusable component rendering team recommendations and project artifacts.
-- Drizzle schema tables, migration scripts, and a database-backed Team Sync repository.
-
----
-
-## Next Evolution Path
-
-- Connect existing AI services (`persona-analysis`, `proposal-analysis`, etc.) into application use cases.
-- Add integration tests per use case and contract tests for repository adapters.
