@@ -888,7 +888,7 @@ export function ProjectProfileManager() {
 			key: "fullName",
 			width: 280,
 			render: (_, candidate) => (
-				<Space direction="vertical" size={2}>
+				<Space orientation="vertical" size={2}>
 					<Typography.Text strong>{candidate.fullName}</Typography.Text>
 					<Typography.Paragraph style={{ margin: 0 }}>
 						{[...candidate.roles, ...candidate.expertise].slice(0, 4).join(", ") || "No role details"}
@@ -1352,7 +1352,7 @@ export function ProjectProfileManager() {
 												</Form.Item>
 												<Form.Item label="Team Member">
 													<Space
-														direction="vertical"
+														orientation="vertical"
 														size={6}
 														style={{ width: "100%" }}
 														className={styles.memberAssignmentCell}
