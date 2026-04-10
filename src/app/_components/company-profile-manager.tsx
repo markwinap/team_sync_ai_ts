@@ -18,6 +18,7 @@ import type { ColumnsType } from "antd/es/table";
 
 import styles from "~/app/team-sync.module.css";
 import { SectionHeader } from "~/app/_components/shared/section-header";
+import { csvToArray } from "~/lib/normalize";
 import { api } from "~/trpc/react";
 
 type CompanyFormValues = {
@@ -37,12 +38,6 @@ const defaultFormValues: CompanyFormValues = {
 	standards: "",
 	partnerships: "",
 };
-
-const toArray = (value: string) =>
-	value
-		.split(",")
-		.map((item) => item.trim())
-		.filter((item) => item.length > 0);
 
 export function CompanyProfileManager() {
 	const utils = api.useUtils();
@@ -134,8 +129,8 @@ export function CompanyProfileManager() {
 			industry: values.industry.trim(),
 			businessIntent: values.businessIntent.trim(),
 			technologyIntent: values.technologyIntent.trim(),
-			standards: toArray(values.standards),
-			partnerships: toArray(values.partnerships),
+			standards: csvToArray(values.standards),
+			partnerships: csvToArray(values.partnerships),
 		};
 
 		if (editingCompanyId) {

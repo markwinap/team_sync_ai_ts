@@ -7,64 +7,23 @@ import type {
 	ProjectProfileDraft,
 	ProjectRecord,
 	ProjectRequirement,
-	RequiredTeamRole,
 	TeamMemberLanguage,
 	TeamMemberProfileDraft,
 	TeamMember,
 } from "~/modules/team-sync/domain/entities";
 import type { TeamSyncRepository } from "~/modules/team-sync/domain/repositories";
+import {
+	normalizeRequiredTeamByRole,
+	resolveRequiredTeamByRole,
+	deriveLegacyTeamRoles,
+	deriveTargetTeamSize,
+} from "~/lib/normalize";
 import { db } from "~/server/db";
 import {
 	teamSyncCompanies,
 	teamSyncProjects,
 	teamSyncTalentMembers,
 } from "~/server/db/schema";
-
-const formatLegacyTeamRole = (entry: RequiredTeamRole) => `${entry.role} (x${entry.headcount})`;
-
-const parseLegacyTeamRole = (value: string): RequiredTeamRole => {
-	const trimmed = value.trim();
-	const match = /^(.*)\(x(\d+)\)$/i.exec(trimmed);
-
-	if (!match) {
-		return { role: trimmed, headcount: 1, allocationPercent: 100 };
-	}
-
-	return {
-		role: match[1]?.trim() ?? trimmed,
-		headcount: Number(match[2]) || 1,
-		allocationPercent: 100,
-	};
-};
-
-const normalizeRequiredTeamByRole = (value: RequiredTeamRole[]) =>
-	value
-		.map((item) => ({
-			role: item.role.trim(),
-			headcount: Number(item.headcount) || 0,
-			allocationPercent: Math.min(100, Math.max(25, Number(item.allocationPercent) || 100)),
-			assignedMemberId: item.assignedMemberId?.trim() || undefined,
-		}))
-		.filter((item) => item.role.length > 0 && item.headcount > 0);
-
-const resolveRequiredTeamByRole = (
-	requiredTeamByRole: RequiredTeamRole[] | null | undefined,
-	teamRoles: string[],
-) => {
-	const normalized = normalizeRequiredTeamByRole(requiredTeamByRole ?? []);
-
-	if (normalized.length > 0) {
-		return normalized;
-	}
-
-	return normalizeRequiredTeamByRole(teamRoles.map(parseLegacyTeamRole));
-};
-
-const deriveLegacyTeamRoles = (requiredTeamByRole: RequiredTeamRole[]) =>
-	requiredTeamByRole.map(formatLegacyTeamRole);
-
-const deriveTargetTeamSize = (requiredTeamByRole: RequiredTeamRole[]) =>
-	requiredTeamByRole.reduce((total, entry) => total + entry.headcount, 0);
 
 export class DrizzleTeamSyncRepository implements TeamSyncRepository {
 	async getCompanyProfile(): Promise<CompanyProfile> {

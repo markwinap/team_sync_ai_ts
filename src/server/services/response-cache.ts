@@ -7,11 +7,13 @@ type CacheEntry = {
     expiresAt: number;
 };
 
+const MAX_CACHE_SIZE = 500;
 const cache = new Map<string, CacheEntry>();
 const cacheMetrics = {
     hits: 0,
     misses: 0,
     expired: 0,
+    evictions: 0,
 };
 
 const stableStringify = (value: unknown): string => {
@@ -67,9 +69,28 @@ export const getCachedValue = <T>(service: string, input: unknown): T | null => 
         return null;
     }
 
+    // LRU touch: re-insert to move to end of Map iteration order
+    cache.delete(key);
+    cache.set(key, entry);
+
     cacheMetrics.hits += 1;
     void recordCacheAccess({ service, inputHash, hit: true });
     return entry.value as T;
+};
+
+const evictOldestEntries = () => {
+    const entriesToRemove = cache.size - MAX_CACHE_SIZE;
+    if (entriesToRemove <= 0) {
+        return;
+    }
+
+    const keys = cache.keys();
+    for (let i = 0; i < entriesToRemove; i++) {
+        const next = keys.next();
+        if (next.done) break;
+        cache.delete(next.value);
+        cacheMetrics.evictions += 1;
+    }
 };
 
 export const setCachedValue = (
@@ -83,6 +104,7 @@ export const setCachedValue = (
         value,
         expiresAt: Date.now() + ttlSeconds * 1000,
     });
+    evictOldestEntries();
 };
 
 export const withResponseCache = async <T>(params: {

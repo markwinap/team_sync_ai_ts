@@ -1,5 +1,6 @@
-import { env } from "~/env";
 import type { TeamMember, TeamMemberLanguage } from "~/modules/team-sync/domain/entities";
+import { normalizeLower, overlapScore, parseMarkdownList, extractJsonObject } from "~/lib/normalize";
+import { callGemini, getGeminiApiKey, getGeminiModel } from "./gemini-client";
 import { AI_GENERATION_CONFIG } from "./ai-config";
 import { withResponseCache } from "./response-cache";
 
@@ -60,35 +61,6 @@ type InternalCandidate = {
 
 const roleWeight = 0.6;
 const stackWeight = 0.4;
-
-const normalize = (value: string | null | undefined) => (value ?? "").trim().toLowerCase();
-
-const parseMarkdownList = (value: string) =>
-    value
-        .split(/\r?\n/)
-        .map((line) => line.trim().replace(/^[-*]\s+/, ""))
-        .filter((line) => line.length > 0);
-
-const overlapScore = (left: string[], right: string[]) => {
-    if (left.length === 0 || right.length === 0) {
-        return 0;
-    }
-
-    const rightSet = new Set(right.map((item) => normalize(item)));
-    const matches = left.filter((item) => rightSet.has(normalize(item))).length;
-    return matches / left.length;
-};
-
-const extractJsonObject = (text: string) => {
-    const start = text.indexOf("{");
-    const end = text.lastIndexOf("}");
-
-    if (start < 0 || end <= start) {
-        return null;
-    }
-
-    return text.slice(start, end + 1);
-};
 
 const rankByBaseline = (candidates: InternalCandidate[]) =>
     candidates
@@ -181,10 +153,10 @@ const buildRankingPrompt = (input: {
 };
 
 const filterSuitableMembers = (input: TeamMemberMatcherInput): InternalCandidate[] => {
-    const normalizedRole = normalize(input.role);
+    const normalizedRole = normalizeLower(input.role);
     const requiredStack = parseMarkdownList(input.projectProfile.requiredTechStack);
     const requiredLanguages = (input.projectProfile.languages ?? [])
-        .map((entry) => normalize(entry.language))
+        .map((entry) => normalizeLower(entry.language))
         .filter((language) => language.length > 0);
 
     const minimumLanguagePercent = Math.max(0, Math.min(100, Math.round(input.minimumLanguagePercent)));
@@ -192,7 +164,7 @@ const filterSuitableMembers = (input: TeamMemberMatcherInput): InternalCandidate
     const suitable = input.members
         .filter((member) => {
             const hasRoleMatch = [...member.roles, ...member.expertise].some((entry) =>
-                normalize(entry).includes(normalizedRole)
+                normalizeLower(entry).includes(normalizedRole)
             );
 
             if (!hasRoleMatch) {
@@ -204,7 +176,7 @@ const filterSuitableMembers = (input: TeamMemberMatcherInput): InternalCandidate
             }
 
             return (member.languages ?? []).some((languageEntry) => {
-                const candidateLanguage = normalize(languageEntry.language);
+                const candidateLanguage = normalizeLower(languageEntry.language);
                 if (!requiredLanguages.includes(candidateLanguage)) {
                     return false;
                 }
@@ -218,7 +190,7 @@ const filterSuitableMembers = (input: TeamMemberMatcherInput): InternalCandidate
             const baselineScore = roleFit * roleWeight + stackFit * stackWeight;
             const matchedLanguages = (member.languages ?? [])
                 .filter((languageEntry) => {
-                    const candidateLanguage = normalize(languageEntry.language);
+                    const candidateLanguage = normalizeLower(languageEntry.language);
                     return (
                         requiredLanguages.includes(candidateLanguage) &&
                         Number(languageEntry.percent) >= minimumLanguagePercent
@@ -252,9 +224,8 @@ export async function recommendTeamMembersForProjectRoleWithAI(
 
     const fallbackCandidates = rankByBaseline(suitableCandidates);
     const fallbackRecommendedMemberId = fallbackCandidates[0]?.memberId;
-    const apiKey = env.GOOGLE_GEMINI_API_KEY;
 
-    if (!apiKey) {
+    if (!getGeminiApiKey()) {
         return {
             candidates: fallbackCandidates,
             recommendedMemberId: fallbackRecommendedMemberId,
@@ -278,69 +249,26 @@ export async function recommendTeamMembersForProjectRoleWithAI(
                     generatedSummary: candidate.member.generatedSummary,
                     baselineScore: Number(candidate.baselineScore.toFixed(4)),
                 })),
-                model: env.GOOGLE_GEMINI_MODEL ?? "gemini-2.5-flash",
+                model: getGeminiModel(),
             },
             ttlSeconds: AI_GENERATION_CONFIG.CACHE_TTL_SECONDS.TEAM_MEMBER_MATCHING,
             compute: async () => {
-                const model = env.GOOGLE_GEMINI_MODEL ?? "gemini-2.5-flash";
-                const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-
-                const response = await fetch(endpoint, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        systemInstruction: {
-                            parts: [
-                                {
-                                    text: [
-                                        "You are a senior software staffing advisor.",
-                                        "Rank candidates only with provided evidence.",
-                                        "Return JSON only without markdown.",
-                                    ].join("\n"),
-                                },
-                            ],
-                        },
-                        contents: [
-                            {
-                                role: "user",
-                                parts: [
-                                    {
-                                        text: buildRankingPrompt({
-                                            role: input.role,
-                                            minimumLanguagePercent: input.minimumLanguagePercent,
-                                            projectProfile: input.projectProfile,
-                                            candidates: suitableCandidates,
-                                        }),
-                                    },
-                                ],
-                            },
-                        ],
-                        generationConfig: {
-                            temperature: AI_GENERATION_CONFIG.TEMPERATURE.DETERMINISTIC,
-                            topP: AI_GENERATION_CONFIG.TOP_P.PRECISE,
-                            maxOutputTokens:
-                                AI_GENERATION_CONFIG.MAX_OUTPUT_TOKENS.TEAM_MEMBER_MATCHING,
-                        },
+                const rawContent = await callGemini({
+                    systemInstruction: [
+                        "You are a senior software staffing advisor.",
+                        "Rank candidates only with provided evidence.",
+                        "Return JSON only without markdown.",
+                    ].join("\n"),
+                    userPrompt: buildRankingPrompt({
+                        role: input.role,
+                        minimumLanguagePercent: input.minimumLanguagePercent,
+                        projectProfile: input.projectProfile,
+                        candidates: suitableCandidates,
                     }),
+                    temperature: AI_GENERATION_CONFIG.TEMPERATURE.DETERMINISTIC,
+                    topP: AI_GENERATION_CONFIG.TOP_P.PRECISE,
+                    maxOutputTokens: AI_GENERATION_CONFIG.MAX_OUTPUT_TOKENS.TEAM_MEMBER_MATCHING,
                 });
-
-                if (!response.ok) {
-                    const errorBody = await response.text();
-                    throw new Error(
-                        `Team member matching failed: ${response.status} ${errorBody}`
-                    );
-                }
-
-                const data = (await response.json()) as {
-                    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-                };
-
-                const rawContent = data.candidates?.[0]?.content?.parts
-                    ?.map((part) => part.text ?? "")
-                    .join("\n")
-                    .trim();
 
                 if (!rawContent) {
                     return {

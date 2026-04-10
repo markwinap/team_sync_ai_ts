@@ -115,14 +115,4 @@ export type ProjectArtifactBundle = {
 	};
 };
 
-export const normalize = (value: string) => value.trim().toLowerCase();
-
-export const overlapScore = (left: string[], right: string[]) => {
-	if (left.length === 0 || right.length === 0) {
-		return 0;
-	}
-
-	const rightSet = new Set(right.map(normalize));
-	const matches = left.filter((item) => rightSet.has(normalize(item))).length;
-	return matches / left.length;
-};
+export { normalizeLower as normalize, overlapScore } from "~/lib/normalize";

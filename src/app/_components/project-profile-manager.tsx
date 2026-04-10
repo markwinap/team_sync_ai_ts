@@ -26,6 +26,15 @@ import { MODAL_WIDTH_WIDE } from "~/app/_components/shared/modal-widths";
 import { mostSpokenLanguageOptions } from "~/app/_components/shared/persona-portal.constants";
 import { SectionHeader } from "~/app/_components/shared/section-header";
 import type { TeamMemberLanguage } from "~/modules/team-sync/domain/entities";
+import {
+	normalizeText,
+	normalizeStringArray,
+	normalizeLanguages,
+	normalizeRequiredTeamByRole,
+	resolveRequiredTeamByRole as resolveTeamByRole,
+	parseLegacyTeamRole,
+	formatTeamMemberLabel,
+} from "~/lib/normalize";
 import { api } from "~/trpc/react";
 import {
 	MarkdownEditableField,
@@ -102,35 +111,6 @@ const defaultFormValues: ProjectFormValues = {
 	deploymentStrategy: "",
 	monitoringAndLogging: "",
 	maintenancePlan: "",
-};
-
-const normalizeText = (value: string | null | undefined) => (value ?? "").trim();
-
-const normalizeRoles = (roles: string[] | null | undefined) =>
-	(roles ?? []).map((role) => normalizeText(role)).filter((role) => role.length > 0);
-
-const normalizeProjectLanguages = (languages: TeamMemberLanguage[] | null | undefined) =>
-	(languages ?? [])
-		.map((entry) => ({
-			language: normalizeText(entry?.language),
-			percent: Number(entry?.percent),
-		}))
-		.filter(
-			(entry) =>
-				entry.language.length > 0 &&
-				Number.isFinite(entry.percent) &&
-				entry.percent >= MIN_PROJECT_LANGUAGE_PERCENT &&
-				entry.percent <= 100,
-		);
-
-const formatTeamMemberLabel = (member: { fullName: string; roles?: string[] | null }) => {
-	const roles = normalizeRoles(member.roles);
-
-	if (roles.length === 0) {
-		return member.fullName;
-	}
-
-	return `${member.fullName} (${roles.join(", ")})`;
 };
 
 type ProjectMarkdownField =
@@ -254,42 +234,6 @@ const teamRoleGenerationReferenceKeys: ProjectReferenceFieldKey[] = [
 	"maintenancePlan",
 ];
 
-const parseRequiredRole = (value: string) => {
-	const trimmedValue = value.trim();
-	const matched = /^(.*)\(x(\d+)\)$/i.exec(trimmedValue);
-
-	if (!matched) {
-		return {
-			role: trimmedValue,
-			headcount: 1,
-		};
-	}
-
-	return {
-		role: matched[1]?.trim() ?? trimmedValue,
-		headcount: Number(matched[2]) || 1,
-	};
-};
-
-const normalizeRequiredTeamByRole = (
-	value:
-		| Array<{
-				role?: string;
-				headcount?: number;
-				allocationPercent?: number;
-				assignedMemberId?: string;
-		  }>
-		| undefined,
-) =>
-	(value ?? [])
-		.map((entry) => ({
-			role: entry.role?.trim() ?? "",
-			headcount: Number(entry.headcount) || 1,
-			allocationPercent: Math.min(100, Math.max(25, Number(entry.allocationPercent) || 100)),
-			assignedMemberId: entry.assignedMemberId?.trim() || undefined,
-		}))
-		.filter((entry) => entry.role.length > 0);
-
 const formatRequiredRole = (entry: { role: string; headcount: number }) => entry.role;
 
 const resolveRequiredTeamByRole = (project: {
@@ -300,13 +244,7 @@ const resolveRequiredTeamByRole = (project: {
 		assignedMemberId?: string;
 	}[];
 	teamRoles: string[];
-}) => {
-	if ((project.requiredTeamByRole ?? []).length > 0) {
-		return normalizeRequiredTeamByRole(project.requiredTeamByRole ?? []);
-	}
-
-	return normalizeRequiredTeamByRole(project.teamRoles.map(parseRequiredRole));
-};
+}) => resolveTeamByRole(project.requiredTeamByRole, project.teamRoles);
 
 export function ProjectProfileManager() {
 	const utils = api.useUtils();
@@ -390,7 +328,7 @@ export function ProjectProfileManager() {
 		const roleSet = new Set<string>();
 
 		for (const member of teamMembers) {
-			for (const role of normalizeRoles(member.roles)) {
+			for (const role of normalizeStringArray(member.roles)) {
 				roleSet.add(role);
 			}
 		}
@@ -660,7 +598,7 @@ export function ProjectProfileManager() {
 			deploymentStrategy: currentValues.deploymentStrategy,
 			monitoringAndLogging: currentValues.monitoringAndLogging,
 			maintenancePlan: currentValues.maintenancePlan,
-			languages: normalizeProjectLanguages(currentValues.languages),
+			languages: normalizeLanguages(currentValues.languages, MIN_PROJECT_LANGUAGE_PERCENT),
 		};
 	};
 
@@ -844,7 +782,7 @@ export function ProjectProfileManager() {
 			projectName: normalizeText(currentValues.projectName),
 			summary: currentValues.summary,
 			purpose: currentValues.purpose,
-			languages: normalizeProjectLanguages(currentValues.languages),
+			languages: normalizeLanguages(currentValues.languages, MIN_PROJECT_LANGUAGE_PERCENT),
 			businessGoals: currentValues.businessGoals,
 			stakeholders: currentValues.stakeholders,
 			scopeIn: currentValues.scopeIn,

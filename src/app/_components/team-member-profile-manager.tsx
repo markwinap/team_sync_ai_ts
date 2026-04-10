@@ -24,6 +24,7 @@ import styles from "~/app/team-sync.module.css";
 import { MarkdownDisplay } from "~/app/_components/shared/markdown-display";
 import { mostSpokenLanguageOptions } from "~/app/_components/shared/persona-portal.constants";
 import { SectionHeader } from "~/app/_components/shared/section-header";
+import { normalizeText, normalizeStringArray, normalizeLanguages } from "~/lib/normalize";
 import { api } from "~/trpc/react";
 import { MODAL_WIDTH_WIDE } from "./shared/modal-widths";
 
@@ -45,11 +46,6 @@ type ProfileFormValues = {
 	generatedSummary: string;
 	languages: LanguageEntry[];
 };
-
-const normalizeTagValues = (values?: string[] | null) =>
-	(values ?? []).map((item) => item.trim()).filter((item) => item.length > 0);
-
-const toText = (value?: string | null) => (value ?? "").trim();
 
 const defaultFormValues: ProfileFormValues = {
 	fullName: "",
@@ -200,26 +196,22 @@ export function TeamMemberProfileManager() {
 		setIsModalOpen(true);
 	};
 
+	const buildNormalizedProfile = (values: Partial<ProfileFormValues>) => ({
+		fullName: normalizeText(values.fullName),
+		email: normalizeText(values.email),
+		roles: normalizeStringArray(values.roles),
+		expertise: normalizeStringArray(values.expertise),
+		techStack: normalizeStringArray(values.techStack),
+		certifications: normalizeStringArray(values.certifications),
+		responsibilities: normalizeStringArray(values.responsibilities),
+		communicationStyle: normalizeText(values.communicationStyle),
+		growthGoals: normalizeStringArray(values.growthGoals),
+		languages: normalizeLanguages(values.languages),
+	});
+
 	const buildSummaryProfilePayload = () => {
 		const values = (form.getFieldsValue(true) ?? {}) as Partial<ProfileFormValues>;
-
-		return {
-			fullName: toText(values.fullName),
-			email: toText(values.email),
-			roles: normalizeTagValues(values.roles),
-			expertise: normalizeTagValues(values.expertise),
-			techStack: normalizeTagValues(values.techStack),
-			certifications: normalizeTagValues(values.certifications),
-			responsibilities: normalizeTagValues(values.responsibilities),
-			communicationStyle: toText(values.communicationStyle),
-			growthGoals: normalizeTagValues(values.growthGoals),
-			languages: (values.languages ?? [])
-				.map((entry) => ({
-					language: toText(entry?.language),
-					percent: Number(entry?.percent),
-				}))
-				.filter((entry) => entry.language.length > 0 && Number.isFinite(entry.percent)),
-		};
+		return buildNormalizedProfile(values);
 	};
 
 	const onGenerateSummary = async () => {
@@ -242,22 +234,8 @@ export function TeamMemberProfileManager() {
 		setValidationMessage(null);
 
 		const payload = {
-			fullName: toText(values.fullName),
-			email: toText(values.email),
-			roles: normalizeTagValues(values.roles),
-			expertise: normalizeTagValues(values.expertise),
-			techStack: normalizeTagValues(values.techStack),
-			certifications: normalizeTagValues(values.certifications),
-			responsibilities: normalizeTagValues(values.responsibilities),
-			communicationStyle: toText(values.communicationStyle),
-			growthGoals: normalizeTagValues(values.growthGoals),
-			generatedSummary: toText(values.generatedSummary),
-			languages: (values.languages ?? [])
-				.map((entry) => ({
-					language: toText(entry?.language),
-					percent: Number(entry?.percent),
-				}))
-				.filter((entry) => entry.language.length > 0 && Number.isFinite(entry.percent)),
+			...buildNormalizedProfile(values),
+			generatedSummary: normalizeText(values.generatedSummary),
 		};
 
 		if (editingMemberId) {

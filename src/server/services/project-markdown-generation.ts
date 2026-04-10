@@ -1,4 +1,5 @@
-import { env } from "~/env";
+import { extractJsonArray } from "~/lib/normalize";
+import { callGemini, getGeminiApiKey, getGeminiModel } from "./gemini-client";
 import { AI_GENERATION_CONFIG } from "./ai-config";
 import { withResponseCache } from "./response-cache";
 
@@ -216,17 +217,6 @@ const sanitizeGeneratedTeamRoles = (
     return normalizeRoleAllocationsByImportance(sanitized);
 };
 
-const extractJsonArray = (content: string) => {
-    const firstBracket = content.indexOf("[");
-    const lastBracket = content.lastIndexOf("]");
-
-    if (firstBracket === -1 || lastBracket === -1 || lastBracket <= firstBracket) {
-        return content;
-    }
-
-    return content.slice(firstBracket, lastBracket + 1);
-};
-
 const buildFallbackTeamRoles = (
     input: GenerateProjectTeamRolesInput
 ): GeneratedProjectTeamRole[] => {
@@ -305,8 +295,7 @@ const buildGenerateTeamRolesPrompt = (input: GenerateProjectTeamRolesInput) => {
 export async function generateProjectMarkdownWithAI(
     input: GenerateProjectMarkdownInput
 ): Promise<string> {
-    const apiKey = env.GOOGLE_GEMINI_API_KEY;
-    if (!apiKey) {
+    if (!getGeminiApiKey()) {
         return buildFallbackContent(input);
     }
 
@@ -316,59 +305,21 @@ export async function generateProjectMarkdownWithAI(
             input: {
                 ...input,
                 referenceFields: sanitizeReferenceFields(input.referenceFields),
-                model: env.GOOGLE_GEMINI_MODEL ?? "gemini-2.5-flash",
+                model: getGeminiModel(),
             },
             ttlSeconds: AI_GENERATION_CONFIG.CACHE_TTL_SECONDS.PROJECT_MARKDOWN,
             compute: async () => {
-                const model = env.GOOGLE_GEMINI_MODEL ?? "gemini-2.5-flash";
-                const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-
-                const response = await fetch(endpoint, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        systemInstruction: {
-                            parts: [
-                                {
-                                    text: [
-                                        "You are a senior solution architect and delivery strategist.",
-                                        "Write practical project profile content.",
-                                        "Return markdown only without code fences.",
-                                    ].join("\n"),
-                                },
-                            ],
-                        },
-                        contents: [
-                            {
-                                role: "user",
-                                parts: [{ text: buildPrompt(input) }],
-                            },
-                        ],
-                        generationConfig: {
-                            temperature: AI_GENERATION_CONFIG.TEMPERATURE.BALANCED,
-                            topP: AI_GENERATION_CONFIG.TOP_P.BALANCED,
-                            maxOutputTokens: AI_GENERATION_CONFIG.MAX_OUTPUT_TOKENS.PROJECT_MARKDOWN,
-                        },
-                    }),
+                const generatedContent = await callGemini({
+                    systemInstruction: [
+                        "You are a senior solution architect and delivery strategist.",
+                        "Write practical project profile content.",
+                        "Return markdown only without code fences.",
+                    ].join("\n"),
+                    userPrompt: buildPrompt(input),
+                    temperature: AI_GENERATION_CONFIG.TEMPERATURE.BALANCED,
+                    topP: AI_GENERATION_CONFIG.TOP_P.BALANCED,
+                    maxOutputTokens: AI_GENERATION_CONFIG.MAX_OUTPUT_TOKENS.PROJECT_MARKDOWN,
                 });
-
-                if (!response.ok) {
-                    const errorBody = await response.text();
-                    throw new Error(
-                        `Project markdown generation failed: ${response.status} ${errorBody}`
-                    );
-                }
-
-                const data = (await response.json()) as {
-                    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-                };
-
-                const generatedContent = data.candidates?.[0]?.content?.parts
-                    ?.map((part) => part.text ?? "")
-                    .join("\n")
-                    .trim();
 
                 if (!generatedContent) {
                     throw new Error("Project markdown generation returned an empty response.");
@@ -387,8 +338,7 @@ export async function generateProjectTeamRolesWithAI(
 ): Promise<GeneratedProjectTeamRole[]> {
     const fallback = buildFallbackTeamRoles(input);
 
-    const apiKey = env.GOOGLE_GEMINI_API_KEY;
-    if (!apiKey) {
+    if (!getGeminiApiKey()) {
         return fallback;
     }
 
@@ -398,59 +348,21 @@ export async function generateProjectTeamRolesWithAI(
             input: {
                 ...input,
                 referenceFields: sanitizeReferenceFields(input.referenceFields),
-                model: env.GOOGLE_GEMINI_MODEL ?? "gemini-2.5-flash",
+                model: getGeminiModel(),
             },
             ttlSeconds: AI_GENERATION_CONFIG.CACHE_TTL_SECONDS.PROJECT_MARKDOWN,
             compute: async () => {
-                const model = env.GOOGLE_GEMINI_MODEL ?? "gemini-2.5-flash";
-                const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-
-                const response = await fetch(endpoint, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        systemInstruction: {
-                            parts: [
-                                {
-                                    text: [
-                                        "You are a senior engineering manager staffing software projects.",
-                                        "Return only valid JSON array with role, headcount, allocationPercent.",
-                                        "No markdown, prose, or code fences.",
-                                    ].join("\n"),
-                                },
-                            ],
-                        },
-                        contents: [
-                            {
-                                role: "user",
-                                parts: [{ text: buildGenerateTeamRolesPrompt(input) }],
-                            },
-                        ],
-                        generationConfig: {
-                            temperature: AI_GENERATION_CONFIG.TEMPERATURE.BALANCED,
-                            topP: AI_GENERATION_CONFIG.TOP_P.BALANCED,
-                            maxOutputTokens: 1200,
-                        },
-                    }),
+                const generatedContent = await callGemini({
+                    systemInstruction: [
+                        "You are a senior engineering manager staffing software projects.",
+                        "Return only valid JSON array with role, headcount, allocationPercent.",
+                        "No markdown, prose, or code fences.",
+                    ].join("\n"),
+                    userPrompt: buildGenerateTeamRolesPrompt(input),
+                    temperature: AI_GENERATION_CONFIG.TEMPERATURE.BALANCED,
+                    topP: AI_GENERATION_CONFIG.TOP_P.BALANCED,
+                    maxOutputTokens: 1200,
                 });
-
-                if (!response.ok) {
-                    const errorBody = await response.text();
-                    throw new Error(
-                        `Project team role generation failed: ${response.status} ${errorBody}`
-                    );
-                }
-
-                const data = (await response.json()) as {
-                    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-                };
-
-                const generatedContent = data.candidates?.[0]?.content?.parts
-                    ?.map((part) => part.text ?? "")
-                    .join("\n")
-                    .trim();
 
                 if (!generatedContent) {
                     return fallback;

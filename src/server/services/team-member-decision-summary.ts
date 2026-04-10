@@ -1,5 +1,6 @@
-import { env } from "~/env";
 import type { TeamMemberProfileDraft } from "~/modules/team-sync/domain/entities";
+import { normalizeText, normalizeStringArray, normalizeLanguages } from "~/lib/normalize";
+import { callGemini, getGeminiApiKey, getGeminiModel } from "./gemini-client";
 import { AI_GENERATION_CONFIG } from "./ai-config";
 import { withResponseCache } from "./response-cache";
 
@@ -8,26 +9,17 @@ type TeamMemberDecisionSummaryInput = {
 };
 
 const normalizeProfile = (input: TeamMemberProfileDraft): TeamMemberProfileDraft => ({
-    fullName: input.fullName.trim(),
-    email: input.email.trim(),
-    roles: input.roles.map((role) => role.trim()).filter((role) => role.length > 0),
-    expertise: input.expertise.map((item) => item.trim()).filter((item) => item.length > 0),
-    techStack: input.techStack.map((item) => item.trim()).filter((item) => item.length > 0),
-    certifications: input.certifications
-        .map((item) => item.trim())
-        .filter((item) => item.length > 0),
-    responsibilities: input.responsibilities
-        .map((item) => item.trim())
-        .filter((item) => item.length > 0),
-    communicationStyle: input.communicationStyle.trim(),
-    growthGoals: input.growthGoals.map((item) => item.trim()).filter((item) => item.length > 0),
-    generatedSummary: input.generatedSummary.trim(),
-    languages: (input.languages ?? [])
-        .map((entry) => ({
-            language: entry.language.trim(),
-            percent: Number(entry.percent),
-        }))
-        .filter((entry) => entry.language.length > 0 && Number.isFinite(entry.percent)),
+    fullName: normalizeText(input.fullName),
+    email: normalizeText(input.email),
+    roles: normalizeStringArray(input.roles),
+    expertise: normalizeStringArray(input.expertise),
+    techStack: normalizeStringArray(input.techStack),
+    certifications: normalizeStringArray(input.certifications),
+    responsibilities: normalizeStringArray(input.responsibilities),
+    communicationStyle: normalizeText(input.communicationStyle),
+    growthGoals: normalizeStringArray(input.growthGoals),
+    generatedSummary: normalizeText(input.generatedSummary),
+    languages: normalizeLanguages(input.languages),
 });
 
 const buildFallbackSummary = (input: TeamMemberDecisionSummaryInput) => {
@@ -100,9 +92,8 @@ export async function generateTeamMemberDecisionSummaryWithAI(
     input: TeamMemberDecisionSummaryInput
 ): Promise<string> {
     const fallback = buildFallbackSummary(input);
-    const apiKey = env.GOOGLE_GEMINI_API_KEY;
 
-    if (!apiKey) {
+    if (!getGeminiApiKey()) {
         return `${fallback}\n\n[AI runtime note] Set GOOGLE_GEMINI_API_KEY (and optionally GOOGLE_GEMINI_MODEL) in .env to enable model-driven summaries.`;
     }
 
@@ -112,67 +103,23 @@ export async function generateTeamMemberDecisionSummaryWithAI(
             input: {
                 ...input,
                 memberProfile: normalizeProfile(input.memberProfile),
-                model: env.GOOGLE_GEMINI_MODEL ?? "gemini-2.5-flash",
+                model: getGeminiModel(),
             },
             ttlSeconds: AI_GENERATION_CONFIG.CACHE_TTL_SECONDS.TEAM_MEMBER_DECISION_SUMMARY,
             compute: async () => {
-                const model = env.GOOGLE_GEMINI_MODEL ?? "gemini-2.5-flash";
-                const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-
-                const response = await fetch(endpoint, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        systemInstruction: {
-                            parts: [
-                                {
-                                    text: [
-                                        "You are a senior engineering staffing advisor.",
-                                        "Prioritize practical role fit and delivery risk.",
-                                        "Return markdown only without code fences.",
-                                    ].join("\n"),
-                                },
-                            ],
-                        },
-                        contents: [
-                            {
-                                role: "user",
-                                parts: [{ text: buildPrompt(input) }],
-                            },
-                        ],
-                        generationConfig: {
-                            temperature: AI_GENERATION_CONFIG.TEMPERATURE.BALANCED,
-                            topP: AI_GENERATION_CONFIG.TOP_P.BALANCED,
-                            maxOutputTokens:
-                                AI_GENERATION_CONFIG.MAX_OUTPUT_TOKENS
-                                    .TEAM_MEMBER_DECISION_SUMMARY,
-                        },
-                    }),
+                const generatedSummary = await callGemini({
+                    systemInstruction: [
+                        "You are a senior engineering staffing advisor.",
+                        "Prioritize practical role fit and delivery risk.",
+                        "Return markdown only without code fences.",
+                    ].join("\n"),
+                    userPrompt: buildPrompt(input),
+                    temperature: AI_GENERATION_CONFIG.TEMPERATURE.BALANCED,
+                    topP: AI_GENERATION_CONFIG.TOP_P.BALANCED,
+                    maxOutputTokens: AI_GENERATION_CONFIG.MAX_OUTPUT_TOKENS.TEAM_MEMBER_DECISION_SUMMARY,
                 });
 
-                if (!response.ok) {
-                    const errorBody = await response.text();
-                    throw new Error(
-                        `Team member summary generation failed: ${response.status} ${errorBody}`
-                    );
-                }
-
-                const data = (await response.json()) as {
-                    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-                };
-
-                const generatedSummary = data.candidates?.[0]?.content?.parts
-                    ?.map((part) => part.text ?? "")
-                    .join("\n")
-                    .trim();
-
-                if (!generatedSummary) {
-                    return fallback;
-                }
-
-                return generatedSummary;
+                return generatedSummary || fallback;
             },
         });
     } catch {
