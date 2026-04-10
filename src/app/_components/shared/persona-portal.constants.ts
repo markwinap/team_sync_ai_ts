@@ -14,3 +14,21 @@ export const COMMUNICATION_TYPE_OPTIONS = [
     { value: "meeting", label: "Meeting" },
     { value: "personality", label: "Personality" },
 ];
+
+export const mostSpokenLanguages = [
+    "English",
+    "Mandarin Chinese",
+    "Hindi",
+    "Spanish",
+    "French",
+    "Modern Standard Arabic",
+    "Bengali",
+    "Portuguese",
+    "Russian",
+    "Urdu",
+] as const;
+
+export const mostSpokenLanguageOptions = mostSpokenLanguages.map((language) => ({
+    label: language,
+    value: language,
+}));

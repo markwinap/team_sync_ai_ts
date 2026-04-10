@@ -151,6 +151,7 @@ export const teamSyncProjects = createTable(
 		operationsPlan: d.text().notNull().default(""),
 		qualityCompliance: d.text().notNull().default(""),
 		dependencies: d.text().notNull().default(""),
+		languages: d.jsonb().$type<TeamMemberLanguage[]>().notNull().default([]),
 		requiredTeamByRole: d.jsonb().$type<RequiredTeamRole[]>().notNull().default([]),
 		teamRoles: d.text().array().notNull().default([]),
 		environments: d.text().notNull().default(""),

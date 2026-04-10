@@ -72,6 +72,7 @@ export type ProjectRequirement = {
 	operationsPlan: string;
 	qualityCompliance: string;
 	dependencies: string;
+	languages: TeamMemberLanguage[];
 	requiredTeamByRole: RequiredTeamRole[];
 	teamRoles: string[];
 	environments: string;

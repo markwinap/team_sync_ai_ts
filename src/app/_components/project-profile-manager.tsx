@@ -22,12 +22,16 @@ import type { ColumnsType } from "antd/es/table";
 import styles from "~/app/team-sync.module.css";
 import { FormModal } from "~/app/_components/shared/form-modal";
 import { MODAL_WIDTH_WIDE } from "~/app/_components/shared/modal-widths";
+import { mostSpokenLanguageOptions } from "~/app/_components/shared/persona-portal.constants";
 import { SectionHeader } from "~/app/_components/shared/section-header";
+import type { TeamMemberLanguage } from "~/modules/team-sync/domain/entities";
 import { api } from "~/trpc/react";
 import {
 	MarkdownEditableField,
 	type MarkdownReferenceField,
 } from "./shared/markdown-editable-field";
+
+const MIN_PROJECT_LANGUAGE_PERCENT = 1;
 
 type ProjectFormValues = {
 	requiredTeamByRole: {
@@ -54,6 +58,7 @@ type ProjectFormValues = {
 	operationsPlan: string;
 	qualityCompliance: string;
 	dependencies: string;
+	languages: TeamMemberLanguage[];
 	environments: string;
 	deploymentStrategy: string;
 	monitoringAndLogging: string;
@@ -80,6 +85,7 @@ const defaultFormValues: ProjectFormValues = {
 	operationsPlan: "",
 	qualityCompliance: "",
 	dependencies: "",
+	languages: [],
 	environments: "",
 	deploymentStrategy: "",
 	monitoringAndLogging: "",
@@ -90,6 +96,20 @@ const normalizeText = (value: string | null | undefined) => (value ?? "").trim()
 
 const normalizeRoles = (roles: string[] | null | undefined) =>
 	(roles ?? []).map((role) => normalizeText(role)).filter((role) => role.length > 0);
+
+const normalizeProjectLanguages = (languages: TeamMemberLanguage[] | null | undefined) =>
+	(languages ?? [])
+		.map((entry) => ({
+			language: normalizeText(entry?.language),
+			percent: Number(entry?.percent),
+		}))
+		.filter(
+			(entry) =>
+				entry.language.length > 0 &&
+				Number.isFinite(entry.percent) &&
+				entry.percent >= MIN_PROJECT_LANGUAGE_PERCENT &&
+				entry.percent <= 100,
+		);
 
 const formatTeamMemberLabel = (member: { fullName: string; roles?: string[] | null }) => {
 	const roles = normalizeRoles(member.roles);
@@ -305,6 +325,7 @@ export function ProjectProfileManager() {
 		operationsPlan: "risk",
 		qualityCompliance: "risk",
 		dependencies: "risk",
+		languages: "overview",
 		requiredTeamByRole: "team",
 		environments: "deployment",
 		deploymentStrategy: "deployment",
@@ -620,6 +641,7 @@ export function ProjectProfileManager() {
 				project.deploymentStrategy,
 				project.monitoringAndLogging,
 				project.maintenancePlan,
+				...(project.languages ?? []).map((entry) => `${entry.language} ${entry.percent}`),
 				...requiredTeamLabels,
 			]
 				.join(" ")
@@ -659,6 +681,7 @@ export function ProjectProfileManager() {
 			projectName: project.projectName,
 			summary: project.summary,
 			purpose: project.purpose,
+			languages: project.languages ?? [],
 			businessGoals: project.businessGoals,
 			stakeholders: project.stakeholders,
 			scopeIn: project.scopeIn,
@@ -707,6 +730,7 @@ export function ProjectProfileManager() {
 			projectName: normalizeText(currentValues.projectName),
 			summary: currentValues.summary,
 			purpose: currentValues.purpose,
+			languages: normalizeProjectLanguages(currentValues.languages),
 			businessGoals: currentValues.businessGoals,
 			stakeholders: currentValues.stakeholders,
 			scopeIn: currentValues.scopeIn,
@@ -840,6 +864,57 @@ export function ProjectProfileManager() {
 						rules={[{ required: true, whitespace: true, message: "Purpose is required" }]}
 					>
 						<Input.TextArea rows={3} placeholder="Why this project exists (markdown supported)" />
+					</Form.Item>
+					<Form.Item label="Languages">
+						<Form.List name="languages">
+							{(fields, { add, remove }) => (
+								<>
+									{fields.map(({ key, name, ...restField }) => (
+										<Space key={key} align="baseline" style={{ display: "flex", marginBottom: 4 }}>
+											<Form.Item
+												{...restField}
+												name={[name, "language"]}
+												rules={[{ required: true, message: "Language is required" }]}
+												style={{ marginBottom: 0 }}
+											>
+												<Select
+													placeholder="Select language"
+													options={mostSpokenLanguageOptions}
+													style={{ width: 220 }}
+													showSearch
+													optionFilterProp="label"
+												/>
+											</Form.Item>
+											<Form.Item
+												{...restField}
+												name={[name, "percent"]}
+												rules={[
+													{ required: true, message: "% is required" },
+													{ type: "number", min: MIN_PROJECT_LANGUAGE_PERCENT, max: 100, message: `Use a value from ${MIN_PROJECT_LANGUAGE_PERCENT} to 100` },
+												]}
+												style={{ marginBottom: 0 }}
+											>
+												<InputNumber
+													min={MIN_PROJECT_LANGUAGE_PERCENT}
+													max={100}
+													placeholder="%"
+													style={{ width: 124 }}
+												/>
+											</Form.Item>
+											<MinusCircleOutlined onClick={() => remove(name)} />
+										</Space>
+									))}
+									<Button
+										type="dashed"
+										onClick={() => add({ language: "", percent: 100 })}
+										icon={<PlusOutlined />}
+										size="small"
+									>
+										Add Language
+									</Button>
+								</>
+							)}
+						</Form.List>
 					</Form.Item>
 				</>
 			),

@@ -22,6 +22,7 @@ import type { ColumnsType } from "antd/es/table";
 
 import styles from "~/app/team-sync.module.css";
 import { MarkdownDisplay } from "~/app/_components/shared/markdown-display";
+import { mostSpokenLanguageOptions } from "~/app/_components/shared/persona-portal.constants";
 import { SectionHeader } from "~/app/_components/shared/section-header";
 import { api } from "~/trpc/react";
 import { MODAL_WIDTH_WIDE } from "./shared/modal-widths";
@@ -63,24 +64,6 @@ const defaultFormValues: ProfileFormValues = {
 	generatedSummary: "",
 	languages: [],
 };
-
-const mostSpokenLanguages = [
-	"English",
-	"Mandarin Chinese",
-	"Hindi",
-	"Spanish",
-	"French",
-	"Modern Standard Arabic",
-	"Bengali",
-	"Portuguese",
-	"Russian",
-	"Urdu",
-];
-
-const languageOptions = mostSpokenLanguages.map((language) => ({
-	label: language,
-	value: language,
-}));
 
 export function TeamMemberProfileManager() {
 	const utils = api.useUtils();
@@ -541,7 +524,7 @@ export function TeamMemberProfileManager() {
 																>
 																		<Select
 																			placeholder="Select language"
-																			options={languageOptions}
+																			options={mostSpokenLanguageOptions}
 																			style={{ width: 220 }}
 																			showSearch
 																			optionFilterProp="label"

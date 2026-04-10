@@ -93,6 +93,23 @@ const requiredTeamByRoleSchema = z
 			.filter((item) => item.role.length > 0),
 	);
 
+const projectLanguageSchema = z
+	.array(
+		z.object({
+			language: z.string().trim().min(1).max(100),
+			percent: z.number().int().min(1).max(100),
+		}),
+	)
+	.default([])
+	.transform((items) =>
+		items
+			.map((item) => ({
+				language: item.language.trim(),
+				percent: item.percent,
+			}))
+			.filter((item) => item.language.length > 0),
+	);
+
 const toLegacyTeamRoleLabel = (item: { role: string; headcount: number }) =>
 	`${item.role} (x${item.headcount})`;
 
@@ -138,6 +155,7 @@ const projectProfileInput = z.object({
 	operationsPlan: z.string().max(3000),
 	qualityCompliance: z.string().max(4000),
 	dependencies: z.string().max(4000),
+	languages: projectLanguageSchema,
 	requiredTeamByRole: requiredTeamByRoleSchema,
 	environments: z.string().max(4000),
 	deploymentStrategy: z.string().max(3000),
