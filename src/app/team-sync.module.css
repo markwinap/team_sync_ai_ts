@@ -1,4 +1,4 @@
-:root {
+.page {
 	--bg: radial-gradient(circle at 18% 12%, #ffe7c7 0%, #f7fbff 44%, #e6f1f7 100%);
 	--text: #13263c;
 	--muted: #3d5c73;
@@ -8,9 +8,6 @@
 	--border: rgba(19, 38, 60, 0.15);
 	--accent: #0f6f8f;
 	--accent-soft: #d8eff7;
-}
-
-.page {
 	min-height: 100vh;
 	padding: 2rem 1.25rem 3rem;
 	background: var(--bg);
