@@ -223,6 +223,36 @@
 	min-height: 180px;
 }
 
+.memberAssignmentCell {
+	position: relative;
+}
+
+.memberAssignmentActions {
+	opacity: 0;
+	pointer-events: none;
+	transform: translateY(2px);
+	transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.memberAssignmentCell:hover .memberAssignmentActions,
+.memberAssignmentCell:focus-within .memberAssignmentActions {
+	opacity: 1;
+	pointer-events: auto;
+	transform: translateY(0);
+}
+
+.teamRoleRemoveButton {
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 140ms ease;
+}
+
+.teamRoleRow:hover .teamRoleRemoveButton,
+.teamRoleRow:focus-within .teamRoleRemoveButton {
+	opacity: 1;
+	pointer-events: auto;
+}
+
 .modalActionDivider {
 	margin: 0.9rem 0 0.75rem;
 	border-color: var(--border);

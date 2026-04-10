@@ -9,6 +9,7 @@ import {
 	Form,
 	Input,
 	InputNumber,
+	Modal,
 	Row,
 	Select,
 	Space,
@@ -63,6 +64,17 @@ type ProjectFormValues = {
 	deploymentStrategy: string;
 	monitoringAndLogging: string;
 	maintenancePlan: string;
+};
+
+type RecommendedTeamMemberCandidate = {
+	memberId: string;
+	fullName: string;
+	roles: string[];
+	expertise: string[];
+	matchedLanguages: string[];
+	generatedSummary: string;
+	matchScore: number;
+	rationale: string;
 };
 
 const defaultFormValues: ProjectFormValues = {
@@ -300,6 +312,15 @@ export function ProjectProfileManager() {
 	const utils = api.useUtils();
 	const [form] = Form.useForm<ProjectFormValues>();
 	const [isModalOpen, setIsModalOpen] = useState(false);
+	const [isTeamMemberPickerModalOpen, setIsTeamMemberPickerModalOpen] = useState(false);
+	const [activeTeamRoleFieldIndex, setActiveTeamRoleFieldIndex] = useState<number | null>(null);
+	const [candidateRecommendations, setCandidateRecommendations] = useState<
+		RecommendedTeamMemberCandidate[]
+	>([]);
+	const [selectedRecommendedMemberId, setSelectedRecommendedMemberId] = useState<string | null>(
+		null,
+	);
+	const [teamMemberPickerMessage, setTeamMemberPickerMessage] = useState<string | null>(null);
 	const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
 	const [activeTabKey, setActiveTabKey] = useState("overview");
 	const [modalValidationMessage, setModalValidationMessage] = useState<string | null>(null);
@@ -409,6 +430,11 @@ export function ProjectProfileManager() {
 	const updateFieldMutation = api.teamSync.updateProjectField.useMutation();
 	const generateFieldMutation = api.teamSync.generateProjectFieldMarkdown.useMutation();
 	const generateTeamRolesMutation = api.teamSync.generateProjectTeamRoles.useMutation();
+	const recommendTeamMembersMutation = api.teamSync.recommendProjectRoleTeamMembers.useMutation({
+		onError: (error) => {
+			setTeamMemberPickerMessage(`Could not load recommendations: ${error.message}`);
+		},
+	});
 
 	const projectReferenceFields = useMemo<MarkdownReferenceField[]>(() => {
 		const companyId = watchedFormValues?.companyId ?? 0;
@@ -604,6 +630,94 @@ export function ProjectProfileManager() {
 		if (modalValidationMessage) {
 			setModalValidationMessage(null);
 		}
+	};
+
+	const buildProjectProfileMatcherPayload = () => {
+		const currentValues = {
+			...defaultFormValues,
+			...form.getFieldsValue(true),
+		} as ProjectFormValues;
+
+		return {
+			projectName: normalizeText(currentValues.projectName),
+			summary: currentValues.summary,
+			purpose: currentValues.purpose,
+			businessGoals: currentValues.businessGoals,
+			stakeholders: currentValues.stakeholders,
+			scopeIn: currentValues.scopeIn,
+			scopeOut: currentValues.scopeOut,
+			architectureOverview: currentValues.architectureOverview,
+			dataModels: currentValues.dataModels,
+			integrations: currentValues.integrations,
+			requiredTechStack: currentValues.requiredTechStack,
+			developmentProcess: currentValues.developmentProcess,
+			timelineMilestones: currentValues.timelineMilestones,
+			riskFactors: currentValues.riskFactors,
+			operationsPlan: currentValues.operationsPlan,
+			qualityCompliance: currentValues.qualityCompliance,
+			dependencies: currentValues.dependencies,
+			environments: currentValues.environments,
+			deploymentStrategy: currentValues.deploymentStrategy,
+			monitoringAndLogging: currentValues.monitoringAndLogging,
+			maintenancePlan: currentValues.maintenancePlan,
+			languages: normalizeProjectLanguages(currentValues.languages),
+		};
+	};
+
+	const closeTeamMemberPickerModal = () => {
+		if (recommendTeamMembersMutation.isPending) {
+			return;
+		}
+
+		setIsTeamMemberPickerModalOpen(false);
+		setActiveTeamRoleFieldIndex(null);
+		setCandidateRecommendations([]);
+		setSelectedRecommendedMemberId(null);
+		setTeamMemberPickerMessage(null);
+	};
+
+	const openTeamMemberPickerModal = async (fieldIndex: number) => {
+		const role = normalizeText(form.getFieldValue(["requiredTeamByRole", fieldIndex, "role"]));
+		if (!role) {
+			setModalValidationMessage("Choose a role first before opening team member recommendations.");
+			return;
+		}
+
+		setModalValidationMessage(null);
+		setActiveTeamRoleFieldIndex(fieldIndex);
+		setTeamMemberPickerMessage(null);
+		setIsTeamMemberPickerModalOpen(true);
+
+		const matcherPayload = buildProjectProfileMatcherPayload();
+		const minimumLanguagePercent = matcherPayload.languages.length
+			? Math.min(...matcherPayload.languages.map((entry) => entry.percent))
+			: MIN_PROJECT_LANGUAGE_PERCENT;
+
+		const response = await recommendTeamMembersMutation.mutateAsync({
+			role,
+			minimumLanguagePercent,
+			projectProfile: matcherPayload,
+		});
+
+		setCandidateRecommendations(response.candidates);
+		setSelectedRecommendedMemberId(response.recommendedMemberId ?? response.candidates[0]?.memberId ?? null);
+		setTeamMemberPickerMessage(
+			response.candidates.length > 0
+				? `Showing ${response.candidates.length} best-fit team members (top 20 ranked by AI match score).`
+				: "No candidates matched this role and language threshold. Try adjusting role or language settings.",
+		);
+	};
+
+	const applyRecommendedTeamMember = () => {
+		if (activeTeamRoleFieldIndex === null) {
+			return;
+		}
+
+		form.setFieldValue(
+			["requiredTeamByRole", activeTeamRoleFieldIndex, "assignedMemberId"],
+			selectedRecommendedMemberId ?? undefined,
+		);
+		closeTeamMemberPickerModal();
 	};
 
 	const isSubmitting = createMutation.isPending || updateMutation.isPending;
@@ -825,6 +939,57 @@ export function ProjectProfileManager() {
 						Edit
 					</Button>
 				</Space>
+			),
+		},
+	];
+
+	const candidateColumns: ColumnsType<RecommendedTeamMemberCandidate> = [
+		{
+			title: "Team Member",
+			dataIndex: "fullName",
+			key: "fullName",
+			width: 280,
+			render: (_, candidate) => (
+				<Space direction="vertical" size={2}>
+					<Typography.Text strong>{candidate.fullName}</Typography.Text>
+					<Typography.Paragraph style={{ margin: 0 }}>
+						{[...candidate.roles, ...candidate.expertise].slice(0, 4).join(", ") || "No role details"}
+					</Typography.Paragraph>
+				</Space>
+			),
+		},
+		{
+			title: "Match Score",
+			dataIndex: "matchScore",
+			key: "matchScore",
+			align: "center",
+			sorter: (left, right) => left.matchScore - right.matchScore,
+			render: (value: number) => `${value}%`,
+			width: 120,
+		},
+		{
+			title: "Matched Languages",
+			dataIndex: "matchedLanguages",
+			key: "matchedLanguages",
+			width: 220,
+			render: (value: string[]) =>
+				value.length > 0 ? (
+					<Typography.Paragraph style={{ margin: 0 }}>
+						{value.join(", ")}
+					</Typography.Paragraph>
+				) : (
+					<Typography.Text type="secondary">None</Typography.Text>
+				),
+		},
+		{
+			title: "Rationale",
+			dataIndex: "rationale",
+			key: "rationale",
+			width: 420,
+			render: (value: string) => (
+				<Typography.Paragraph ellipsis={{ rows: 3, tooltip: value }} style={{ margin: 0 }}>
+					{value}
+				</Typography.Paragraph>
 			),
 		},
 	];
@@ -1200,6 +1365,7 @@ export function ProjectProfileManager() {
 									{fields.map((field) => (
 										<Row
 											key={field.key}
+											className={styles.teamRoleRow}
 											gutter={[12, 0]}
 											align="middle"
 											style={{
@@ -1224,7 +1390,7 @@ export function ProjectProfileManager() {
 													/>
 												</Form.Item>
 											</Col>
-											<Col xs={24} md={6}>
+											<Col xs={24} md={3}>
 												<Form.Item
 													label="Allocation %"
 													name={[field.name, "allocationPercent"]}
@@ -1242,26 +1408,54 @@ export function ProjectProfileManager() {
 													/>
 												</Form.Item>
 											</Col>
-											<Col xs={24} md={8}>
-												<Form.Item
-													label="Optional Team Member"
-													name={[field.name, "assignedMemberId"]}
-												>
-													<Select
-														allowClear
-														showSearch
-														options={teamMemberOptions}
-														placeholder="Select profile"
-														optionFilterProp="label"
-														notFoundContent="No team profiles"
-													/>
+											<Col xs={24} md={12}>
+												<Form.Item name={[field.name, "assignedMemberId"]} style={{ display: "none" }}>
+													<Input type="hidden" />
+												</Form.Item>
+												<Form.Item label="Team Member">
+													<Space
+														direction="vertical"
+														size={6}
+														style={{ width: "100%" }}
+														className={styles.memberAssignmentCell}
+													>
+														{(() => {
+															const assignedMemberLabel = teamMemberNameById.get(
+																form.getFieldValue(["requiredTeamByRole", field.name, "assignedMemberId"]),
+															);
+
+															return assignedMemberLabel ? (
+																<Typography.Text strong>{assignedMemberLabel}</Typography.Text>
+															) : (
+																<Typography.Text>No team member assigned</Typography.Text>
+															);
+														})()}
+														<Space wrap className={styles.memberAssignmentActions}>
+															<Button
+																type="default"
+																onClick={() => void openTeamMemberPickerModal(field.name)}
+															>
+																Find Best Match
+															</Button>
+															<Button
+																type="default"
+																danger
+																onClick={() =>
+																	form.setFieldValue(["requiredTeamByRole", field.name, "assignedMemberId"], undefined)
+																}
+															>
+																Remove
+															</Button>
+														</Space>
+													</Space>
 												</Form.Item>
 											</Col>
-											<Col xs={24} md={2}>
+											<Col xs={24} md={1}>
 												<Form.Item label=" " style={{ marginBottom: 0 }}>
 													<Button
 														type="text"
 														danger
+														className={styles.teamRoleRemoveButton}
 														icon={<MinusCircleOutlined />}
 														onClick={() => remove(field.name)}
 													/>
@@ -1274,7 +1468,7 @@ export function ProjectProfileManager() {
 							)}
 						</Form.List>
 						<Typography.Text type="secondary">
-							You can optionally pre-assign a profile to each role from available team members.
+							You can optionally pre-assign a team member for each role using AI-ranked recommendations.
 						</Typography.Text>
 					</>
 				),
@@ -1369,6 +1563,44 @@ export function ProjectProfileManager() {
 					items={tabItems}
 				/>
 			</FormModal>
+			<Modal
+				title="Choose Team Member Match"
+				open={isTeamMemberPickerModalOpen}
+				onCancel={closeTeamMemberPickerModal}
+				onOk={applyRecommendedTeamMember}
+				okText="Assign Selected Member"
+				okButtonProps={{ disabled: !selectedRecommendedMemberId }}
+				confirmLoading={recommendTeamMembersMutation.isPending}
+				width={1100}
+			>
+				{teamMemberPickerMessage && (
+					<Alert
+						showIcon
+						type={candidateRecommendations.length > 0 ? "info" : "warning"}
+						title={teamMemberPickerMessage}
+						style={{ marginBottom: 12 }}
+					/>
+				)}
+				<Table
+					rowKey="memberId"
+					columns={candidateColumns}
+					dataSource={candidateRecommendations}
+					tableLayout="auto"
+					scroll={{ x: 1040 }}
+					pagination={{ pageSize: 8, showSizeChanger: false }}
+					size="small"
+					rowSelection={{
+						type: "radio",
+						columnWidth: 48,
+						selectedRowKeys: selectedRecommendedMemberId ? [selectedRecommendedMemberId] : [],
+						onChange: (selectedRowKeys) => {
+							const selectedKey = selectedRowKeys[0];
+							setSelectedRecommendedMemberId(typeof selectedKey === "string" ? selectedKey : null);
+						},
+					}}
+					loading={recommendTeamMembersMutation.isPending}
+				/>
+			</Modal>
 		</section>
 	);
 }

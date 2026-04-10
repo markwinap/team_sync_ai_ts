@@ -8,6 +8,7 @@ import {
 	generateProjectMarkdownWithAI,
 	generateProjectTeamRolesWithAI,
 } from "~/server/services/project-markdown-generation";
+import { recommendTeamMembersForProjectRoleWithAI } from "~/server/services/team-member-matching";
 import { generateTeamMemberDecisionSummaryWithAI } from "~/server/services/team-member-decision-summary";
 
 const createFacade = () => {
@@ -170,6 +171,31 @@ const projectProfileInput = z.object({
 	),
 }));
 
+const projectProfileMatcherInput = z.object({
+	projectName: z.string().trim().min(2).max(255),
+	summary: z.string().max(2000),
+	purpose: z.string().max(2000),
+	businessGoals: z.string().max(4000),
+	stakeholders: z.string().max(4000),
+	scopeIn: z.string().max(4000),
+	scopeOut: z.string().max(4000),
+	architectureOverview: z.string().max(3000),
+	dataModels: z.string().max(4000),
+	integrations: z.string().max(4000),
+	requiredTechStack: z.string().max(4000),
+	developmentProcess: z.string().max(3000),
+	timelineMilestones: z.string().max(4000),
+	riskFactors: z.string().max(4000),
+	operationsPlan: z.string().max(3000),
+	qualityCompliance: z.string().max(4000),
+	dependencies: z.string().max(4000),
+	environments: z.string().max(4000),
+	deploymentStrategy: z.string().max(3000),
+	monitoringAndLogging: z.string().max(3000),
+	maintenancePlan: z.string().max(3000),
+	languages: projectLanguageSchema,
+});
+
 const projectMarkdownReferenceFieldSchema = z.object({
 	key: z.string().trim().min(1).max(64),
 	label: z.string().trim().min(1).max(120),
@@ -297,6 +323,24 @@ export const teamSyncRouter = createTRPCRouter({
 			});
 
 			return { generatedRoles };
+		}),
+	recommendProjectRoleTeamMembers: publicProcedure
+		.input(
+			z.object({
+				role: z.string().trim().min(1).max(128),
+				minimumLanguagePercent: z.number().int().min(0).max(100),
+				projectProfile: projectProfileMatcherInput,
+			}),
+		)
+		.mutation(async ({ input }) => {
+			const repository = new DrizzleTeamSyncRepository();
+			const members = await repository.listTeamMemberProfiles();
+			return recommendTeamMembersForProjectRoleWithAI({
+				role: input.role,
+				minimumLanguagePercent: input.minimumLanguagePercent,
+				projectProfile: input.projectProfile,
+				members,
+			});
 		}),
 	createTeamMemberProfile: publicProcedure
 		.input(teamMemberProfileInput)
