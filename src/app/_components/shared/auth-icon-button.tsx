@@ -2,30 +2,20 @@
 
 import { LoginOutlined, LogoutOutlined } from "@ant-design/icons";
 import { Button, Tooltip } from "antd";
-import { signIn, signOut, useSession } from "next-auth/react";
 
-export function AuthIconButton() {
-  const { status } = useSession();
+type AuthIconButtonProps = {
+  isAuthenticated: boolean;
+};
 
-  const isAuthenticated = status === "authenticated";
-  const isLoading = status === "loading";
-
-  const handleClick = () => {
-    if (isAuthenticated) {
-      void signOut({ callbackUrl: "/" });
-      return;
-    }
-
-    void signIn("github", { callbackUrl: "/" });
-  };
+export function AuthIconButton({ isAuthenticated }: AuthIconButtonProps) {
+  const href = isAuthenticated ? "/api/auth/signout" : "/api/auth/signin";
 
   return (
     <Tooltip title={isAuthenticated ? "Sign out" : "Sign in with GitHub"}>
       <Button
         aria-label={isAuthenticated ? "Sign out" : "Sign in"}
-        disabled={isLoading}
+        href={href}
         icon={isAuthenticated ? <LogoutOutlined /> : <LoginOutlined />}
-        onClick={handleClick}
         shape="circle"
       />
     </Tooltip>
